@@ -16,6 +16,7 @@ from trinary.ui.screen_view import ScreenView
 from trinary.ui.execution_trace import ExecutionTrace
 from trinary.ui.machine_code_view import MachineCodeView
 from trinary.ui.demos import DEMOS
+from trinary.display import DisplayMemoryMap
 
 
 class MainWindow(QMainWindow):
@@ -198,11 +199,11 @@ class MainWindow(QMainWindow):
         self.execution_trace.clear_trace()
         self.memory_view.clear_marks()
         self._prev_mem = {}
+        DisplayMemoryMap().clear(self.cpu.memory)
         self._update_views()
         self.machine_code_view.update_view(self.program, self.machine_code)
         self.banner_label.setText("")
         self.assembler_editor.clear_highlight()
-        self.screen_view.refresh(self.cpu.memory)
         self.status_bar.showMessage("Reset — ready to run")
 
     def _snapshot_memory(self):
