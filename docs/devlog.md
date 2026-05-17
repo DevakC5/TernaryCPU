@@ -399,3 +399,91 @@ Implemented a complete fetch-decode-execute cycle for a custom ternary instructi
 * subroutines
 * execution tracing
 * performance benchmarking
+
+# Devlog 012 — Stack System & Subroutine Execution
+
+## Overview
+
+Implemented:
+
+* stack operations
+* subroutine execution
+* function call mechanics
+* return address management
+
+The architecture now supports structured program flow similar to real processor systems.
+
+---
+
+## New Instructions
+
+### PUSH
+
+Push register value onto stack.
+
+### POP
+
+Restore value from stack.
+
+### CALL
+
+Jump to subroutine while preserving return address.
+
+### RET
+
+Restore return address and continue execution.
+
+### HALT
+
+Stop processor execution.
+
+---
+
+## Major Architectural Milestone
+
+The CPU now supports:
+
+* nested execution flow
+* subroutine calls
+* stack-based state preservation
+* procedural execution structures
+
+This marks the transition from a basic instruction interpreter to a complete virtual-machine-like architecture.
+
+---
+
+## Example Execution Flow
+
+CALL:
+
+* pushes current PC onto stack
+* jumps to target address
+
+RET:
+
+* pops return address
+* restores execution flow
+
+---
+
+## Current Architecture
+
+CPU
+├── Registers
+├── ALU
+├── Flags
+├── Stack
+├── Program Counter
+├── Memory
+└── Fetch-Decode-Execute Cycle
+
+---
+
+## Future Directions
+
+* assembler
+* symbolic labels
+* machine code encoding
+* debugger
+* instruction tracing
+* ternary executable format
