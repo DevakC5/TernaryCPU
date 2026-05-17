@@ -311,3 +311,91 @@ This marks the transition from isolated arithmetic systems to processor-like com
 * opcode decoding
 * CPU control flow
 * fetch-decode-execute cycle
+
+# Devlog 010 — CPU Core & Instruction Execution
+
+## Overview
+
+Implemented the first functional ternary CPU execution core.
+
+The architecture now supports:
+
+* instruction parsing
+* opcode decoding
+* ALU execution
+* register state management
+* conditional branching
+* program control flow
+
+---
+
+## CPU Components
+
+Current CPU structure:
+
+CPU
+├── Registers (R0-R3)
+├── Program Counter (PC)
+├── Flags
+├── ALU
+└── Fetch-Decode-Execute Cycle
+
+---
+
+## Supported Instructions
+
+### Data Operations
+
+* LOAD
+* MOV
+* CLR
+
+### Arithmetic
+
+* ADD
+* SUB
+
+### Logic
+
+* AND
+* OR
+* NOT
+
+### Comparison
+
+* CMP
+
+### Control Flow
+
+* JMP
+* JZ
+* JNZ
+
+---
+
+## Major Architectural Milestone
+
+The project now supports:
+
+* sequential program execution
+* conditional branching
+* processor state transitions
+
+This marks the transition from isolated computational modules to a functioning processor architecture.
+
+---
+
+## Key Achievement
+
+Implemented a complete fetch-decode-execute cycle for a custom ternary instruction set architecture (ISA).
+
+---
+
+## Next Targets
+
+* memory simulation
+* addressable RAM
+* stack system
+* subroutines
+* execution tracing
+* performance benchmarking
