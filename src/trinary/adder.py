@@ -5,14 +5,7 @@ Provides ternary half adder, full adder, and ripple carry adder using
 standard unbalanced ternary: sum = (a + b) % 3, carry = (a + b) // 3.
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.logic import validate_trit
+from trinary.logic import validate_trit
 
 
 def half_adder(a, b):

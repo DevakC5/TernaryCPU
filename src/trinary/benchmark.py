@@ -8,17 +8,10 @@ Experimental measurements for paper-worthy data:
 - Carry propagation depth
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.cpu import CPU
-from core.assembler import Assembler
-from core.adder import full_adder, ripple_carry_adder
-from core.conversion import decimal_to_ternary, ternary_to_decimal, binary_to_decimal, decimal_to_binary
+from trinary.cpu import CPU
+from trinary.assembler import Assembler
+from trinary.adder import full_adder, ripple_carry_adder
+from trinary.conversion import decimal_to_ternary, ternary_to_decimal, binary_to_decimal, decimal_to_binary
 
 
 def benchmark_instruction_counts():
@@ -150,8 +143,8 @@ def benchmark_memory_usage():
     print("BENCHMARK: MEMORY USAGE")
     print("=" * 70)
 
-    from core.memory import Memory
-    from core.cpu import CPU
+    from trinary.memory import Memory
+    from trinary.cpu import CPU
 
     print("\n--- Register File ---")
     print("Size: 4 registers × variable trit strings")

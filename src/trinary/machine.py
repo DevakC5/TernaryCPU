@@ -32,14 +32,7 @@ Register encoding (trit):
     3 = R3
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.assembler import Assembler
+from trinary.assembler import Assembler
 
 
 OPCODE_MAP = {
@@ -60,6 +53,8 @@ OPCODE_MAP = {
     "CALL": "112",
     "RET": "120",
     "HALT": "121",
+    "MUL": "122",
+    "DIV": "200",
 }
 
 OPCODE_REVERSE = {v: k for k, v in OPCODE_MAP.items()}
@@ -95,7 +90,7 @@ def encode_immediate(value):
 
 def encode_address(addr):
     """Encode address (decimal string/int) to ternary."""
-    from core.conversion import decimal_to_ternary
+    from trinary.conversion import decimal_to_ternary
     if isinstance(addr, str):
         if addr.isdigit():
             addr = int(addr)
@@ -183,7 +178,7 @@ def decode_instruction(machine_code):
 
     if opcode in ("JMP", "JZ", "JNZ", "CALL"):
         if rest:
-            from core.conversion import ternary_to_decimal
+            from trinary.conversion import ternary_to_decimal
             addr = ternary_to_decimal(rest)
             return f"{opcode} {addr}"
         return f"{opcode} ?"

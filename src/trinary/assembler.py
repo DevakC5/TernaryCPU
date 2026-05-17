@@ -27,14 +27,7 @@ Produces:
     5: RET
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.cpu import CPU
+from trinary.cpu import CPU
 
 
 class Assembler:
@@ -42,7 +35,7 @@ class Assembler:
 
     OPCODES = {
         "LOAD", "MOV", "CLR",
-        "ADD", "SUB", "AND", "OR", "NOT",
+        "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
         "CMP", "JMP", "JZ", "JNZ",
         "PUSH", "POP", "CALL", "RET", "HALT"
     }
@@ -61,6 +54,8 @@ class Assembler:
         line = line.strip()
         if not line or line.startswith("#"):
             return None, None, []
+        if "#" in line:
+            line = line[:line.index("#")].strip()
 
         if ":" in line:
             label, rest = line.split(":", 1)

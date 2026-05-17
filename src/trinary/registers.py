@@ -5,14 +5,7 @@ Simulates R0, R1, R2, R3 registers that store ternary values.
 Operations: LOAD, STORE, MOVE.
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.conversion import validate_ternary
+from trinary.conversion import validate_ternary
 
 
 class RegisterFile:
@@ -30,10 +23,11 @@ class RegisterFile:
         return True
 
     def validate_value(self, value):
-        """Validate ternary value."""
+        """Validate ternary value (optional leading -)."""
         if not isinstance(value, str):
             raise ValueError("Register value must be a string")
-        for c in value:
+        body = value[1:] if value and value[0] == "-" else value
+        for c in body:
             if c not in "012":
                 raise ValueError(f"Invalid trit: {c}. Must be 0, 1, or 2")
         return True

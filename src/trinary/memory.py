@@ -5,12 +5,6 @@ Simulates addressable memory for the CPU.
 Stores ternary values at integer addresses.
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
 
 
 class Memory:
@@ -34,10 +28,11 @@ class Memory:
         return True
 
     def validate_value(self, value):
-        """Validate ternary value."""
+        """Validate ternary value (optional leading -)."""
         if not isinstance(value, str):
             raise ValueError("Value must be a string")
-        for c in value:
+        body = value[1:] if value and value[0] == "-" else value
+        for c in body:
             if c not in "012":
                 raise ValueError(f"Invalid trit: {c}. Must be 0, 1, or 2")
         return True

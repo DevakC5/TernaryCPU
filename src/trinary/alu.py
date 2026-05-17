@@ -4,20 +4,12 @@ Ternary ALU (Arithmetic Logic Unit).
 Provides: ADD, SUB, AND, OR, NOT, CMP operations on ternary strings.
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.adder import ripple_carry_adder
-from core.arithmetic import add_ternary, subtract_ternary
-from core.logic import tnot, tand, tor, validate_trit
-from core.conversion import ternary_to_decimal, decimal_to_ternary
+from trinary.arithmetic import add_ternary, subtract_ternary, multiply_ternary, divide_ternary
+from trinary.logic import tnot, tand, tor, validate_trit
+from trinary.conversion import ternary_to_decimal, decimal_to_ternary
 
 
-VALID_OPERATIONS = ("ADD", "SUB", "AND", "OR", "NOT", "CMP")
+VALID_OPERATIONS = ("ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT", "CMP")
 
 
 def validate_operation(op):
@@ -27,10 +19,11 @@ def validate_operation(op):
 
 
 def validate_ternary_string(s):
-    """Validate a ternary string."""
+    """Validate a ternary string (optional leading -)."""
     if not isinstance(s, str):
         raise ValueError("Input must be a string")
-    for c in s:
+    body = s[1:] if s and s[0] == "-" else s
+    for c in body:
         if c not in "012":
             raise ValueError(f"Invalid trit: {c}. Must be 0, 1, or 2")
     return True
@@ -71,7 +64,7 @@ def alu(operation, a, b=None):
     """
     validate_operation(operation)
 
-    if operation in ("ADD", "SUB", "AND", "OR"):
+    if operation in ("ADD", "SUB", "MUL", "DIV", "AND", "OR"):
         if b is None:
             raise ValueError(f"Operation {operation} requires two operands")
         validate_ternary_string(a)
@@ -86,11 +79,19 @@ def alu(operation, a, b=None):
             validate_ternary_string(b)
 
     if operation == "ADD":
-        result, _ = ripple_carry_adder(a, b)
+        result = add_ternary(a, b)
         return (result, None)
 
     if operation == "SUB":
         result = subtract_ternary(a, b)
+        return (result, None)
+
+    if operation == "MUL":
+        result = multiply_ternary(a, b)
+        return (result, None)
+
+    if operation == "DIV":
+        result = divide_ternary(a, b)
         return (result, None)
 
     if operation == "NOT":
@@ -108,11 +109,8 @@ def alu(operation, a, b=None):
         return (result, None)
 
     if operation == "CMP":
-        dec_a = ternary_to_decimal(a)
-        if b is not None:
-            dec_b = ternary_to_decimal(b)
-        else:
-            dec_b = 0
+        dec_a = ternary_to_decimal(a) if a else 0
+        dec_b = ternary_to_decimal(b) if b else 0
         if dec_a == dec_b:
             return ("EQ", None)
         elif dec_a < dec_b:

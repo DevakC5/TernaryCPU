@@ -36,12 +36,15 @@ def validate_binary(binary):
 
 
 def validate_ternary(ternary):
-    """Validate that a string contains only ternary digits (0, 1, or 2)."""
+    """Validate a ternary string (digits 0-2, optional leading -)."""
     if not isinstance(ternary, str) or not ternary:
         raise ValueError("Ternary input must be a non-empty string.")
 
-    if any(char not in "012" for char in ternary):
-        raise ValueError("Ternary input may only contain 0, 1, and 2.")
+    s = ternary[1:] if ternary[0] == "-" else ternary
+    if not s:
+        raise ValueError("Ternary input must be a non-empty string.")
+    if any(char not in "012" for char in s):
+        raise ValueError("Ternary input may only contain 0, 1, 2, and an optional leading -.")
 
     return True
 
@@ -58,9 +61,13 @@ def binary_to_decimal(binary):
 
 
 def decimal_to_ternary(decimal):
-    """Convert a non-negative decimal integer to a ternary string."""
-    if not isinstance(decimal, int) or decimal < 0:
-        raise ValueError("Decimal input must be a non-negative integer.")
+    """Convert a decimal integer to a ternary string (negative → leading -)."""
+    if not isinstance(decimal, int):
+        raise ValueError("Decimal input must be an integer.")
+
+    negative = decimal < 0
+    if negative:
+        decimal = -decimal
 
     if decimal == 0:
         return "0"
@@ -70,7 +77,8 @@ def decimal_to_ternary(decimal):
         digits.append(str(decimal % 3))
         decimal //= 3
 
-    return "".join(reversed(digits))
+    result = "".join(reversed(digits))
+    return "-" + result if negative else result
 
 
 def ternary_to_binary(ternary):
@@ -93,14 +101,17 @@ def ternary_to_binary(ternary):
 
 
 def ternary_to_decimal(ternary):
-    """Convert a ternary string to its decimal integer value."""
+    """Convert a ternary string to decimal (leading - → negative)."""
     validate_ternary(ternary)
 
+    negative = ternary[0] == "-"
+    s = ternary[1:] if negative else ternary
+
     decimal_value = 0
-    for index, digit in enumerate(reversed(ternary)):
+    for index, digit in enumerate(reversed(s)):
         decimal_value += int(digit) * (3 ** index)
 
-    return decimal_value
+    return -decimal_value if negative else decimal_value
 
 
 def decimal_to_binary(decimal):

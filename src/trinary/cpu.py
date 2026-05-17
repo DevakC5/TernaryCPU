@@ -13,6 +13,8 @@ Opcodes:
     CLR   dst         - Clear register (set to "0")
     ADD   dst src     - dst = dst + src
     SUB   dst src     - dst = dst - src
+    MUL   dst src     - dst = dst * src
+    DIV   dst src     - dst = dst / src
     AND   dst src     - dst = dst AND src
     OR    dst src     - dst = dst OR src
     NOT   dst         - dst = NOT dst
@@ -29,16 +31,9 @@ Stack: Grows downward from STACK_BASE (default 255)
 Registers: R0, R1, R2, R3, SP (stack pointer)
 """
 
-import sys
-from pathlib import Path
-
-_src = Path(__file__).resolve().parent.parent
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from core.registers import RegisterFile
-from core.alu import alu
-from core.memory import Memory
+from trinary.registers import RegisterFile
+from trinary.alu import alu
+from trinary.memory import Memory
 
 
 class CPU:
@@ -46,7 +41,7 @@ class CPU:
 
     OPCODES = {
         "LOAD", "MOV", "CLR",
-        "ADD", "SUB", "AND", "OR", "NOT",
+        "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
         "CMP", "JMP", "JZ", "JNZ",
         "PUSH", "POP", "CALL", "RET", "HALT"
     }
@@ -143,6 +138,20 @@ class CPU:
             a = self.registers.store(dst)
             b = self.registers.store(src)
             result, _ = alu("SUB", a, b)
+            self.registers.load(dst, result)
+
+        elif opcode == "MUL":
+            dst, src = operands
+            a = self.registers.store(dst)
+            b = self.registers.store(src)
+            result, _ = alu("MUL", a, b)
+            self.registers.load(dst, result)
+
+        elif opcode == "DIV":
+            dst, src = operands
+            a = self.registers.store(dst)
+            b = self.registers.store(src)
+            result, _ = alu("DIV", a, b)
             self.registers.load(dst, result)
 
         elif opcode == "AND":
