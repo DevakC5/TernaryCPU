@@ -236,3 +236,78 @@ Operations:
 LOAD
 STORE
 MOVE
+
+# Devlog 009 — Register File Implementation
+
+## Overview
+
+Implemented a ternary register file system.
+
+Registers provide temporary high-speed storage for computational operations and processor state management.
+
+---
+
+## Implemented Registers
+
+Current architecture:
+
+* R0
+* R1
+* R2
+* R3
+
+Each register stores ternary values as strings.
+
+---
+
+## Supported Operations
+
+### LOAD
+
+Stores a ternary value into a register.
+
+Example:
+LOAD R0, "102"
+
+---
+
+### STORE
+
+Reads the current register value.
+
+---
+
+### MOVE
+
+Copies one register value into another register.
+
+Example:
+MOVE R0, R1
+
+---
+
+### CLEAR
+
+Resets register contents to:
+0
+
+---
+
+## Architectural Importance
+
+The register file introduces:
+
+* processor state
+* temporary working memory
+* data transfer operations
+
+This marks the transition from isolated arithmetic systems to processor-like computational state management.
+
+---
+
+## Next Targets
+
+* instruction execution
+* opcode decoding
+* CPU control flow
+* fetch-decode-execute cycle
