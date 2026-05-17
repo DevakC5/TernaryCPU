@@ -125,4 +125,43 @@ loop:
 done:
     HALT
 """,
+    "CPU Stress": """\
+# CPU stress test: 5-level nested calls + push/pop + long countdown
+start:
+    LOAD R0 2
+    CALL level1
+countdown:
+    LOAD R0 100
+    LOAD R1 0
+    LOAD R2 1
+    CLR R3
+loop:
+    CMP R0 R1
+    JZ done
+    SUB R0 R2
+    JMP loop
+done:
+    HALT
+level1:
+    ADD R0 R0
+    CALL level2
+    RET
+level2:
+    ADD R0 R0
+    CALL level3
+    RET
+level3:
+    ADD R0 R0
+    CALL level4
+    RET
+level4:
+    ADD R0 R0
+    CALL level5
+    RET
+level5:
+    ADD R0 R0
+    PUSH R0
+    POP R1
+    RET
+""",
 }
