@@ -12,6 +12,7 @@ from trinary.ui.controls import Controls
 from trinary.ui.register_view import RegisterView
 from trinary.ui.memory_view import MemoryView
 from trinary.ui.stack_view import StackView
+from trinary.ui.screen_view import ScreenView
 from trinary.ui.execution_trace import ExecutionTrace
 from trinary.ui.machine_code_view import MachineCodeView
 from trinary.ui.demos import DEMOS
@@ -93,6 +94,12 @@ class MainWindow(QMainWindow):
         self.stack_view = StackView()
         stack_layout.addWidget(self.stack_view)
         right_layout.addWidget(stack_group)
+
+        display_group = QGroupBox("Display")
+        display_layout = QVBoxLayout(display_group)
+        self.screen_view = ScreenView()
+        display_layout.addWidget(self.screen_view)
+        right_layout.addWidget(display_group)
         mid_splitter.addWidget(right_panel)
 
         mid_splitter.setSizes([500, 600])
@@ -195,6 +202,7 @@ class MainWindow(QMainWindow):
         self.machine_code_view.update_view(self.program, self.machine_code)
         self.banner_label.setText("")
         self.assembler_editor.clear_highlight()
+        self.screen_view.refresh(self.cpu.memory)
         self.status_bar.showMessage("Reset — ready to run")
 
     def _snapshot_memory(self):
@@ -240,3 +248,4 @@ class MainWindow(QMainWindow):
             self.banner_label.setText(f"▶  EXECUTING:  {instr}")
         else:
             self.banner_label.setText("")
+        self.screen_view.refresh(self.cpu.memory)

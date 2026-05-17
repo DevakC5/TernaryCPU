@@ -37,7 +37,8 @@ class Assembler:
         "LOAD", "MOV", "CLR",
         "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
         "CMP", "JMP", "JZ", "JNZ",
-        "PUSH", "POP", "CALL", "RET", "HALT"
+        "PUSH", "POP", "CALL", "RET", "HALT",
+        "STOREM", "LOADM",
     }
 
     BRANCH_OPCODES = {"JMP", "JZ", "JNZ", "CALL"}
@@ -52,10 +53,11 @@ class Assembler:
             tuple: (label_or_none, opcode_or_none, operands_list)
         """
         line = line.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith("#") or line.startswith(";"):
             return None, None, []
-        if "#" in line:
-            line = line[:line.index("#")].strip()
+        for marker in ("#", ";"):
+            if marker in line:
+                line = line[:line.index(marker)].strip()
 
         if ":" in line:
             label, rest = line.split(":", 1)
@@ -82,6 +84,7 @@ class Assembler:
         Returns:
             int: Number of instruction lines (excluding labels alone)
         """
+        self.labels = {}
         address = 0
         for line in lines:
             label, opcode, operands = self.parse_line(line)

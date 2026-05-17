@@ -51,7 +51,7 @@ No `__init__.py` in `src/` — the `pyproject.toml` `[tool.setuptools.packages.f
 
 ## Key facts
 
-- **19 opcodes**: LOAD, MOV, CLR, ADD, SUB, MUL, DIV, AND, OR, NOT, CMP, JMP, JZ, JNZ, PUSH, POP, CALL, RET, HALT.
+- **21 opcodes**: LOAD, MOV, CLR, ADD, SUB, MUL, DIV, AND, OR, NOT, CMP, JMP, JZ, JNZ, PUSH, POP, CALL, RET, HALT, STOREM, LOADM.
 - **MUL/DIV** assigned to ternary opcodes `122` / `200`. All other opcodes use the original ARCHITECTURE.md encodings.
 - **Negative numbers** use signed-magnitude with a leading `-` prefix (e.g., `"-10"` = −3 in decimal). All converters, arithmetic, ALU, and validation support it.
 - **Inline comments** (`#`) are stripped by the assembler's `parse_line` — the old demos no longer break.

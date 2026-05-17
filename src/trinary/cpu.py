@@ -43,7 +43,8 @@ class CPU:
         "LOAD", "MOV", "CLR",
         "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
         "CMP", "JMP", "JZ", "JNZ",
-        "PUSH", "POP", "CALL", "RET", "HALT"
+        "PUSH", "POP", "CALL", "RET", "HALT",
+        "STOREM", "LOADM",
     }
 
     STACK_BASE = 255
@@ -234,6 +235,26 @@ class CPU:
         elif opcode == "HALT":
             self.halted = True
             return
+
+        elif opcode == "STOREM":
+            addr_op, src = operands
+            if addr_op in self.registers.REGISTER_NAMES:
+                from trinary.conversion import ternary_to_decimal as t2d
+                addr = t2d(self.registers.store(addr_op))
+            else:
+                addr = int(addr_op)
+            value = self.registers.store(src)
+            self.memory.store(addr, value)
+
+        elif opcode == "LOADM":
+            addr_op, dst = operands
+            if addr_op in self.registers.REGISTER_NAMES:
+                from trinary.conversion import ternary_to_decimal as t2d
+                addr = t2d(self.registers.store(addr_op))
+            else:
+                addr = int(addr_op)
+            value = self.memory.load(addr)
+            self.registers.load(dst, value)
 
         self.pc += 1
 

@@ -164,4 +164,42 @@ level5:
     POP R1
     RET
 """,
+    "Hello Display": """\
+# Memory-mapped display demo
+# Writes text into video RAM at addresses 200-215
+start:
+    LOAD R0 2200   # H
+    STOREM 200 R0
+    LOAD R0 2120   # E
+    STOREM 201 R0
+    LOAD R0 2211   # L
+    STOREM 202 R0
+    LOAD R0 2211   # L
+    STOREM 203 R0
+    LOAD R0 2221   # O
+    STOREM 204 R0
+    LOAD R0 1012   # (space)
+    STOREM 205 R0
+    LOAD R0 10010  # T
+    STOREM 206 R0
+    LOAD R0 2120   # E
+    STOREM 207 R0
+    LOAD R0 10001  # R
+    STOREM 208 R0
+    LOAD R0 2220   # N
+    STOREM 209 R0
+    LOAD R0 2102   # A
+    STOREM 210 R0
+    LOAD R0 10001  # R
+    STOREM 211 R0
+    LOAD R0 10022  # Y
+    STOREM 212 R0
+    LOAD R0 1012   # (space)
+    STOREM 213 R0
+    LOAD R0 10012  # V
+    STOREM 214 R0
+    LOAD R0 2212   # M
+    STOREM 215 R0
+    HALT
+""",
 }

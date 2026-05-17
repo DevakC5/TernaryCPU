@@ -55,6 +55,8 @@ OPCODE_MAP = {
     "HALT": "121",
     "MUL": "122",
     "DIV": "200",
+    "STOREM": "201",
+    "LOADM": "202",
 }
 
 OPCODE_REVERSE = {v: k for k, v in OPCODE_MAP.items()}
@@ -120,6 +122,16 @@ def encode_instruction(instr, labels=None):
 
     if opcode in ("RET", "HALT", "NOT"):
         return op_code
+
+    if opcode in ("STOREM", "LOADM"):
+        reg = encode_register(operands[1])
+        addr = operands[0]
+        if addr.isdigit():
+            addr_ternary = encode_address(addr)
+        else:
+            from trinary.conversion import decimal_to_ternary
+            addr_ternary = decimal_to_ternary(int(addr))
+        return op_code + reg + addr_ternary
 
     if opcode in ("JMP", "JZ", "JNZ", "CALL"):
         addr = operands[0]
@@ -190,6 +202,28 @@ def decode_instruction(machine_code):
     if opcode in ("PUSH", "POP"):
         src = decode_register(rest[0]) if rest else "?"
         return f"{opcode} {src}"
+
+    if opcode == "STOREM":
+        if rest:
+            reg = decode_register(rest[0])
+            addr_trits = rest[1:]
+            if addr_trits:
+                from trinary.conversion import ternary_to_decimal
+                addr = ternary_to_decimal(addr_trits)
+                return f"{opcode} {addr} {reg}"
+            return f"{opcode} {reg} ?"
+        return f"{opcode} ?"
+
+    if opcode == "LOADM":
+        if rest:
+            reg = decode_register(rest[0])
+            addr_trits = rest[1:]
+            if addr_trits:
+                from trinary.conversion import ternary_to_decimal
+                addr = ternary_to_decimal(addr_trits)
+                return f"{opcode} {addr} {reg}"
+            return f"{opcode} {reg} ?"
+        return f"{opcode} ?"
 
     if opcode == "CLR":
         dst = decode_register(rest[0]) if rest else "?"
