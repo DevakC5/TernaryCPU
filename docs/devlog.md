@@ -209,3 +209,30 @@ Next targets:
 * registers
 * instruction encoding
 * memory simulation
+
+
+NEXT STEP
+Registers
+
+Create:
+
+registers.py
+
+Simulate:
+
+R0
+R1
+R2
+R3
+
+Each stores ternary values.
+
+Example:
+
+R0 = "102"
+
+Operations:
+
+LOAD
+STORE
+MOVE
