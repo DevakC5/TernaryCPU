@@ -1,6 +1,6 @@
 # PyQt6 Desktop UI — Visual Simulator Guide
 
-The Trinary Visual Simulator is a full-featured desktop debugger for the ternary CPU, built with PyQt6. It provides real-time visibility into every aspect of CPU state.
+The Trinary Visual Simulator is a full-featured desktop debugger for the ternary CPU, built with PyQt6. It provides real-time visibility into every aspect of CPU state — from registers and memory to pipeline stages and bus transactions.
 
 ---
 
@@ -16,38 +16,30 @@ python -m trinary.ui.app
 ## Layout
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  [Demo: ▼] [Assemble] [▶ Run] [⤵ Step Into] [⤴ Step Over]   │
-│  [↺ Reset] [⏸ Pause] [▶ Continue]      Cycles: 0            │
-├────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────┬────────────────────────────────┐     │
-│  │                      │  Registers:                    │     │
-│  │  Assembly Editor     │  R0: 0  R1: 0  R2: 0  R3: 0  │     │
-│  │  (syntax highlight)  │  PC: 0   SP: 255              │     │
-│  │  (breakpoints)       │  Flags: Z[ ] E[ ] G[ ] L[ ]  │     │
-│  │                      ├────────────────────────────────┤     │
-│  │  Machine Code View   │  Memory (0..511):             │     │
-│  │  (ternary opcodes)   │  │Addr│Value│                  │     │
-│  │                      │  │  0 │  0  │                  │     │
-│  │                      │  │  1 │  0  │                  │     │
-│  │                      ├────────────────────────────────┤     │
-│  │                      │  Stack (SP→):                 │     │
-│  │                      │  [255] 0                       │     │
-│  │                      │  [254] 0                       │     │
-│  │                      ├────────────────────────────────┤     │
-│  │                      │  Display:                      │     │
-│  │                      │  ┌──────────────────────┐      │     │
-│  │                      │  │  27×27 pixel grid    │      │     │
-│  │                      │  └──────────────────────┘      │     │
-│  └──────────────────────┴────────────────────────────────┘     │
-├────────────────────────────────────────────────────────────────┤
-│  Execution Trace:                                              │
-│  │Step│ PC│ Instruction     │ R0│R1│R2│R3│Flags  │            │
-│  │  0 │ 0 │ LOAD R0 10     │ 0 │ 0│ 0│ 0│Z:0...│            │
-│  │  1 │ 1 │ LOAD R1 12     │10 │ 0│ 0│ 0│Z:0...│            │
-│  │  2 │ 2 │ ADD R0 R1      │10 │12│ 0│ 0│Z:0...│            │
-│  │  3 │ 3 │ HALT           │22 │12│ 0│ 0│Z:1...│            │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ [Demo: ▼] [Assemble] [▶ Run] [⤵ Step] [↺ Reset] [⏸ Pause]    │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌────────────────────────┬──────────────────────────────┐       │
+│ │                        │  Inspector: R0–R3, PC, SP   │       │
+│ │  Assembly Editor       │  Flags: Z[ ] E[ ] G[ ] L[ ]│       │
+│ │  (syntax highlight)    ├──────────────────────────────┤       │
+│ │  (breakpoints)         │  Memory (0..511):            │       │
+│ │                        ├──────────────────────────────┤       │
+│ │  Machine Code View     │  Stack Viewer                │       │
+│ │  (ternary opcodes)     ├──────────────────────────────┤       │
+│ │                        │  Pipeline Widget             │       │
+│ │                        │  Cache Widget                │       │
+│ │                        │  Branch Widget               │       │
+│ │                        │  Bus Widget                  │       │
+│ │                        ├──────────────────────────────┤       │
+│ │                        │  Performance Dashboard       │       │
+│ │                        │  Timeline / Waveform Viewer  │       │
+│ │                        ├──────────────────────────────┤       │
+│ │                        │  Game Window (SDK)           │       │
+│ └────────────────────────┴──────────────────────────────┘       │
+├──────────────────────────────────────────────────────────────────┤
+│  Execution Trace: Step│PC│Instruction│R0│R1│R2│R3│Flags         │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -55,8 +47,6 @@ python -m trinary.ui.app
 ## Panels
 
 ### 1. Assembly Editor (`assembler_editor.py`)
-
-A full-featured source code editor with:
 
 **Syntax Highlighting:**
 | Token | Color |
@@ -67,98 +57,114 @@ A full-featured source code editor with:
 | Comments (# / ;) | Dim green |
 | Numbers | White |
 
-**Breakpoints:** Click in the gutter (line number area) to toggle a red dot breakpoint. Breakpoints pause execution before the instruction executes.
+**Breakpoints:** Click in the gutter to toggle. Breakpoints pause execution before the instruction executes. A yellow arrow marks the current PC.
 
-**Current Line:** A yellow arrow in the gutter marks the current PC.
+### 2. Machine Code Viewer
 
-**Features:**
-- `get_source()` — returns current editor text
-- `highlight_line(line)` — scrolls to and highlights a line
-- `toggle_breakpoint(line)` — programmatic breakpoint toggle
-- `get_breakpoints()` — returns set of line numbers with breakpoints
+Displays a table with columns: `#` (address), `Assembly` (original instruction), `Machine Code` (ternary opcode string). Highlights the current line.
 
-### 2. Machine Code Viewer (`machine_code_view.py`)
+### 3. Inspector Widget (`inspector_widget.py`)
 
-Displays the assembled machine code in a table:
-
-| Column | Content |
-|--------|---------|
-| # | Instruction address |
-| Assembly | Original assembly instruction |
-| Machine Code | Ternary opcode string |
-
-Highlights the current line as the CPU executes.
-
-### 3. Register Panel (`register_view.py`)
-
-Shows all CPU state registers:
-
-- **R0–R3**: Current register values. Flashes green briefly when the value changes.
-- **PC**: Program counter
-- **SP**: Stack pointer
-- **Flags**: Four indicators (ZERO, EQUAL, GREATER, LESS) — active style when True, dim when False.
+Shows all CPU state:
+- **R0–R3**: Flash green on change
+- **PC, SP**: Current values
+- **Flags**: Four indicators (ZERO, EQUAL, GREATER, LESS)
 
 ### 4. Memory Viewer (`memory_view.py`)
 
-A 512-row table showing memory contents:
+512-row table with:
+- **Access Tracking**: Green = written, Blue = read (fades over time)
+- **PC Highlight**: Current PC row highlighted
 
-| Column | Content |
-|--------|---------|
-| Address | Memory address (0–511) |
-| Value | Ternary string stored at that address |
+### 5. Stack Viewer
 
-**Access Tracking:**
-- Green background: recently written address
-- Blue background: recently read address
-- Colors fade after a configurable timeout
+Memory stack (addresses SP+1 to 255) with SP position marker and item count.
 
-**Current PC Highlight:** The row corresponding to the current PC address is highlighted.
+### 6. Execution Trace
 
-### 5. Stack Viewer (`stack_view.py`)
+Running log: Step#, PC, Instruction, R0–R3, Flags. Auto-scrolls.
 
-Displays the memory stack (addresses SP+1 to 255):
+### 7. Pipeline Widget (`pipeline_widget.py`)
 
-- Shows each stack slot with its address and value
-- Labels the SP position with a pointer indicator
-- Shows item count
+Visualizes the 5-stage pipeline (IF→ID→EX→MEM→WB):
+- Shows which instruction occupies each stage
+- Displays bubbles (stalls) and flushes (mispredicts)
+- Cycle-by-cycle stage occupancy
 
-### 6. Execution Trace (`execution_trace.py`)
+### 8. Cache Widget (`cache_widget.py`)
 
-A running log of all executed instructions:
+Direct-mapped L1 cache viewer:
+- Cache lines with tag, valid bit, dirty bit, data
+- Hit/miss counters
+- Address-to-line mapping
 
-| Column | Content |
-|--------|---------|
-| Step | Sequential step number |
-| PC | Address of the instruction |
-| Instruction | Decompiled assembly |
-| R0–R3 | Register state after execution |
-| Flags | Flag state after execution |
+### 9. Branch Widget (`branch_widget.py`)
 
-Auto-scrolls to the most recent entry.
+Branch predictor state:
+- 2-bit saturating counter values
+- Prediction history (taken/not taken)
+- Accuracy percentage (correct / total)
 
-### 7. Pixel Display (`screen_view.py`)
+### 10. Bus Widget (`bus_widget.py`)
 
-A 27×27 pixel framebuffer rendered as a 324×324 pixel widget:
+System bus transaction viewer:
+- Transaction log (requestor, address, type, cycle)
+- Arbitration events
+- Contention tracking
 
-- Each "pixel" is 12×12 screen pixels
-- Colors: black (0), gray (1), white (2)
-- Draws using QPainter
+### 11. Performance Widget (`performance_widget.py`)
 
-**Keyboard Capture:** When the pixel display has focus, key presses are captured and written to memory address 260 (the keyboard buffer), allowing the OS shell to receive input.
+Real-time performance dashboard:
+- CPI (cycles per instruction)
+- IPC (instructions per cycle)
+- Cache hit rate
+- Branch prediction accuracy
+- Total cycles and instructions retired
 
-### 8. Controls Toolbar (`controls.py`)
+### 12. Timeline Widget (`timeline_widget.py`)
+
+Cycle-by-cycle trace visualization:
+- Horizontal timeline of executed instructions
+- Pipeline stage markers per cycle
+- Event annotations (cache miss, branch mispredict, interrupt)
+
+### 13. Waveform Widget (`waveform_widget.py`)
+
+Signal waveform viewer:
+- Visualizes signal transitions over cycles
+- Multiple signal traces
+- Zoom and scroll controls
+
+### 14. Game Window (`game_window.py`)
+
+Fantasy Console game display:
+- 64×64 pixel framebuffer at 8× scale
+- Keyboard input binding
+- Game loop integration with SDK Runtime
+
+### 15. Debugger (`debugger_widget.py`)
+
+Full debugger panel:
+- Run/Step/Continue controls
+- Breakpoint management
+- Watch expressions
+- CPU state overview
+
+### 16. Pixel Display (`screen_view.py`)
+
+27×27 pixel framebuffer for legacy graphics (black/gray/white). Keyboard capture for OS shell input.
+
+### 17. Controls Toolbar (`controls.py`)
 
 | Control | Function |
 |---------|----------|
-| Demo selector (combo box) | Load 13 pre-written demo programs |
-| Assemble | Run the assembler on the editor content |
-| Run (▶) | Execute to completion (or until breakpoint/halt) |
+| Demo selector | Load pre-written demo programs |
+| Assemble | Run assembler on editor content |
+| Run (▶) | Execute to completion / breakpoint |
 | Step Into (⤵) | Execute one instruction |
-| Step Over (⤴) | Step, or if CALL, run until return |
 | Reset (↺) | Reset CPU to initial state |
 | Pause (⏸) | Pause running program |
 | Continue (▶) | Resume after pause |
-| Cycle counter | Shows total cycles executed |
 
 ---
 
@@ -168,26 +174,14 @@ A 27×27 pixel framebuffer rendered as a 324×324 pixel widget:
 User types in editor
     → Assemble button
         → Assembler.assemble(source)
-            → (program, labels)
-        → Machine.encode_instruction() for each instruction
-            → (machine_code list)
-        → Update MachineCodeView
+        → Machine.encode_instruction()
         → CPU.load_program(program)
 
 User clicks Run
-    → CPU.run()
-        → loop: CPU.step()
-            → Update RegisterView
-            → Update MemoryView
-            → Update StackView
-            → Update ExecutionTrace
-            → Check breakpoints → pause
-            → Update MachineCodeView highlight
-            → Process UI events (keep responsive)
-
-User clicks Step Into
-    → CPU.step()
-    → Update all views
+    → CPU.run() / CPU.step()
+        → Update all views
+        → Check breakpoints
+        → Process UI events
 
 User types in ScreenView
     → Write d2t(ord(char)) to memory[260]
@@ -198,55 +192,30 @@ User types in ScreenView
 
 ## Theme
 
-The UI uses a dark cyberpunk theme defined in `styles.py`. Key colors:
-
-```css
-/* Background */
-background-color: #0a0a0f;
-
-/* Text */
-color: #00ff88;
-
-/* Opcodes in editor */
-color: #00ffff;  /* cyan */
-
-/* Registers */
-color: #ffff00;  /* yellow */
-
-/* Labels */
-color: #aa66ff;  /* purple */
-
-/* Comments */
-color: #004400;  /* dim green */
-
-/* Buttons */
-background-color: #1a1a2e;
-color: #00ff88;
-```
+Dark cyberpunk theme in `styles.py`:
+- Background: `#0a0a0f`
+- Text: `#00ff88` (green)
+- Opcodes: `#00ffff` (cyan)
+- Registers: `#ffff00` (yellow)
+- Labels: `#aa66ff` (purple)
+- Comments: `#004400` (dim green)
+- Buttons: `#1a1a2e` with `#00ff88` text
 
 ---
 
-## 13 Demo Programs
-
-The demo selector includes these programs:
+## Demo Programs
 
 | Demo | Description |
 |------|-------------|
 | Countdown | Counts 5→0 with loop |
 | Fibonacci | Computes F(3)=2 |
-| Factorial | Computes 3! = 6 |
-| Sum 1 to N | Sums 1+2+3+4+5 |
+| Factorial | 3! = 6 |
+| Sum 1 to N | 1+2+3+4+5 |
 | Calculator | ((10+5)-3)+2 = 14 |
-| Subroutine Average | CALL/RET with add_routines |
-| Logical Operations | AND, OR, NOT demos |
-| Comparison | CMP + conditional jumps |
-| Stack Operations | PUSH/POP visualization |
 | Timer Interrupt | Periodic timer firing |
-| Pixel Diagonal | Diagonal lines on framebuffer |
-| Pixel Checkerboard | 3×3 checkerboard |
-| Pixel Smiley | Ternary smiley face |
+| Pixel Diagonal | Framebuffer lines |
 | Keyboard Echo | Type and see characters |
-| CPU Display Demo | End-to-end display demo |
+| (+ more) | 15+ programs total |
 
 ---
 
@@ -256,21 +225,15 @@ The demo selector includes these programs:
 
 ```python
 # In main_window.py:
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-
 class MyPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("My Panel"))
-    
+
     def update_state(self, cpu):
         """Called after each CPU step."""
         pass
-
-# In MainWindow.__init__:
-self.my_panel = MyPanel()
-# Add to an existing splitter or layout
 ```
 
 ### Adding a New Demo

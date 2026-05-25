@@ -1,12 +1,19 @@
 # Display System, Keyboard & OS Shell
 
+The Trinary CPU has two display subsystems that coexist:
+
+| Layer | VRAM Range | Display | Keyboard | Used by |
+|-------|-----------|---------|----------|---------|
+| **Legacy** (text) | 200–255 | 7×8 chars via `DisplayMemoryMap` | 260 | `os.py`, `demo_programs.py`, `cpu.py` default |
+| **SDK** (framebuffer) | 1000–5095 | 64×64 pixel `Framebuffer` | 9000–9001 | `os/` package, `sdk/`, `demo_games.py`, PyQt6 |
+
 ---
 
-## 1. Memory-Mapped Display
+## 1. Legacy Text Display (200–255)
 
 ### Overview
 
-The Trinary CPU uses a memory-mapped text display. RAM addresses 200–255 form the Video RAM (VRAM), where each cell stores the ternary encoding of an ASCII character code.
+Memory-mapped text display. RAM addresses 200–255 form the Video RAM (VRAM), where each cell stores the ternary encoding of an ASCII character code.
 
 ### Specifications
 
@@ -18,19 +25,6 @@ The Trinary CPU uses a memory-mapped text display. RAM addresses 200–255 form 
 | Zero value | `"0"` → renders as space |
 | Non-printable | chr(0)..chr(31) render as `.` |
 
-### How Characters Are Stored
-
-Characters are stored as ternary representations of their ASCII codes:
-
-```python
-# Write character 'T' (ASCII 84) to VRAM position 0:
-memory.store(200, decimal_to_ternary(84))  # stores "10010"
-
-# Read it back:
-ternary_to_decimal(memory.load(200))  # → 84
-chr(84)                               # → 'T'
-```
-
 ### DisplayMemoryMap API
 
 ```python
@@ -38,54 +32,133 @@ from trinary.display import DisplayMemoryMap
 
 display = DisplayMemoryMap()
 
-# Read current display contents
 chars = display.read_display(memory)
-# Returns list of 56 characters (spaces for 0, dots for non-printable)
-
-# Write text starting at offset
 display.write_text(memory, "Hello", offset=0)
-
-# Clear the display
 display.clear(memory)
 ```
 
 ### Assembly Example
 
 ```asm
-# Display character 'H' at VRAM position 0
-LOAD R0 0              # Cursor position
-LOAD R2 200            # VRAM base address
-ADD R0 R2              # R0 = 200 (absolute VRAM address)
-LOAD R1 2200           # R1 = d2t(ord('H')) = "2200" (ASCII 72)
-STOREM R0 R1           # memory[200] = "2200"
-
-# Or using STOREM with literal address:
-LOAD R1 2200           # R1 = 'H'
+LOAD R1 2200           # R1 = 'H' (ternary for ASCII 72)
 STOREM 200 R1          # memory[200] = "2200"
-
-# Load from VRAM:
 LOADM 200 R0           # R0 = memory[200] = "2200"
 ```
 
-### Assembly Character Constants
-
-For convenience, character values can be generated in Python:
+### Character Constants
 
 ```python
-def _t(ch):
-    return d2t(ord(ch))
-
-# Examples:
-_t("T")   # → "10010"  (ternary for 84)
-_t("r")   # → "11020"  (ternary for 114)
-_t("!")   # → "1020"   (ternary for 33)
-_t(" ")   # → "1012"   (ternary for 32)
+from trinary.conversion import decimal_to_ternary as d2t
+d2t(ord('H'))   # "2200"  (72)
+d2t(ord('e'))   # "11020" (101)
 ```
 
+---
 
-## 2. OS Shell Display Driver
+## 2. SDK Framebuffer Display (1000–5095)
 
-The OS shell (`os.py`) uses a cursor-based display driver written in assembly. The driver manages a cursor offset, character output, and scrolling.
+The SDK provides a 64×64 pixel framebuffer with a 9-color palette, designed for game graphics.
+
+### Specifications
+
+| Property | Value |
+|----------|-------|
+| VRAM range | 1000–5095 (4096 cells) |
+| Resolution | 64 × 64 pixels |
+| Colors | 9 (black, dark gray, white, red, green, blue, yellow, cyan, magenta) |
+| Pixel addressing | `address = 1000 + y * 64 + x` |
+
+### Color Palette
+
+| Index | Name | RGB |
+|-------|------|-----|
+| 0 | Black | (0, 0, 0) |
+| 1 | Dark gray | (64, 64, 64) |
+| 2 | White | (200, 200, 200) |
+| 3 | Red | (200, 40, 40) |
+| 4 | Green | (40, 180, 40) |
+| 5 | Blue | (40, 80, 220) |
+| 6 | Yellow | (200, 200, 40) |
+| 7 | Cyan | (40, 200, 200) |
+| 8 | Magenta | (200, 40, 200) |
+
+### Assembly Example
+
+```asm
+# Set pixel at (10, 5) to red (color 3)
+# address = 1000 + 5*64 + 10 = 1330
+LOAD R0 3
+STOREM 1330 R0
+
+# Read pixel
+LOADM 1330 R1
+```
+
+### Python API
+
+```python
+from trinary.display.framebuffer import Framebuffer
+
+fb = Framebuffer()
+fb.set_pixel(x, y, color)
+fb.get_buffer()       # 64×64 int matrix
+fb.clear()
+```
+
+### Memory Hooks
+
+```python
+memory.register_write_hook(1000, 5095, callback)
+```
+
+---
+
+## 3. Keyboard Input
+
+### Legacy Keyboard (address 260)
+
+| Address | Purpose |
+|---------|---------|
+| 260 | Keyboard buffer (ternary ASCII code) |
+
+Polling protocol:
+1. CPU reads address 260
+2. If non-zero, key is waiting
+3. Process key
+4. Write `"0"` to 260 to acknowledge
+
+```asm
+main:
+    LOADM 260 R1       # Poll keyboard
+    CMP R1 R3          # Compare with 0
+    JZ main            # No key
+    STOREM 260 R3      # Acknowledge
+    CALL kbd           # Process key
+    JMP main
+```
+
+### SDK Keyboard (addresses 9000–9001)
+
+| Address | Purpose |
+|---------|---------|
+| 9000 | Key data register (ASCII code as ternary) |
+| 9001 | Key status register (1 = key waiting, 0 = none) |
+
+Used by the Fantasy Console SDK and modern OS. Supports 8-button mapping:
+LEFT/RIGHT/UP/DOWN/A/B/START/SELECT.
+
+```python
+from trinary.sdk.api import btn, btnp
+
+if btn("LEFT"):    x -= 1
+if btnp("A"):      jump()
+```
+
+---
+
+## 4. Legacy OS Shell Display Driver
+
+The legacy OS shell (`os.py`) uses a cursor-based display driver written in assembly.
 
 ### Cursor Memory
 
@@ -102,138 +175,24 @@ The OS shell (`os.py`) uses a cursor-based display driver written in assembly. T
 | `vdec` | — | Decrement cursor by 1 |
 | `cls` | — | Clear entire VRAM, reset cursor to 0 |
 
-### vput Implementation
-
-```
-vput:
-    LOADM 0 R0          # R0 = cursor
-    cmp R0 with 55      # full?
-    JZ  full_scroll     # if full, scroll first
-    LOAD R2 VRB         # R2 = 200 (VRAM base)
-    ADD R0 R2           # R0 = 200 + cursor
-    STOREM R0 R1        # memory[cursor_pos] = char
-    CALL vinc           # cursor += 1
-    RET
-
-full_scroll:
-    CALL doscroll       # scroll up, cursor = 48
-    LOADM 0 R0          # R0 = 48
-    LOAD R2 VRB         # R2 = 200
-    ADD R0 R2           # R0 = 248
-    STOREM R0 R1        # write char at position 48 (start of last row)
-    LOAD R0 49          # cursor = 49
-    STOREM 0 R0
-    RET
-```
-
 ### Scrolling
 
 When the cursor reaches position 55 (last VRAM cell), the display scrolls:
+1. Copy addresses 201→200, 202→201, ..., 247→246
+2. Clear addresses 248–255 (last row)
+3. Set cursor to 48
 
-1. Copy addresses 201→200, 202→201, ..., 247→246 (shifts content up one row)
-2. Clear addresses 248–255 (the last row, 8 characters)
-3. Set cursor to 48 (first position of the now-empty last row)
+---
 
-```
-Before scroll:              After scroll:
-┌────────────────────┐      ┌────────────────────┐
-│ 0: Trishell!>      │      │ 0: rishell!> HE    │  ← shifted up
-│ 8:  HELP           │      │ 8: LP - CLS ME     │
-│ 16:                │      │ 16: ... shifted    │
-│ 24:                │      │ 24: ...             │
-│ 32:                │      │ 32: ...             │
-│ 40:                │      │ 40: ...here goes    │ ← last char scrolled off
-│ 48: user input...  │      │ 48: _               │ ← cleared for new input
-└────────────────────┘      └────────────────────┘
-```
-
-
-## 3. Keyboard Input
-
-### Keyboard Buffer
-
-| Address | Purpose |
-|---------|---------|
-| 260 | Keyboard buffer (ternary ASCII code) |
-
-### Polling Protocol
-
-The keyboard uses a simple polling protocol:
-
-1. CPU reads memory address 260
-2. If value is non-zero, a key is waiting
-3. Process the key
-4. Write `"0"` to address 260 to acknowledge
-
-### OS Keyboard Driver
-
-The OS main loop polls address 260 each cycle:
-
-```asm
-main:
-    LOADM 260 R1       # Poll keyboard
-    CMP R1 R3          # Compare with 0 (R3 is always 0)
-    JZ main            # No key, keep polling
-    STOREM 260 R3      # Acknowledge: clear buffer
-    CALL kbd           # Process key
-    JMP main           # Back to polling
-```
-
-### Key Processing (kbd)
-
-The `kbd` routine handles character classification:
-
-```
-kbd:
-    Compare R1 with backspace (127)
-        → JZ kbsp (backspace handler)
-    Compare R1 with newline (10) or CR (13)
-        → JZ kent (enter handler)
-    Otherwise:
-        CALL bufadd      # Add char to input buffer
-        Compare R1 with space
-            → JZ main (don't echo spaces)
-        CALL vput        # Echo char to display
-        RET
-```
-
-### Key Injection (Python)
-
-```python
-os = OS()
-os.boot()
-
-# Inject a keypress
-os.feed_key('H')              # Writes d2t(ord('H')) to memory[260]
-os.feed_key(chr(10))           # Newline (Enter)
-os.feed_key(chr(127))          # Backspace
-```
-
-
-## 4. OS Shell Architecture
-
-### Overview
-
-The OS shell (`os.py`) is a 342-instruction assembly program that boots into an interactive command prompt. It provides keyboard input, display output, line editing, and command execution.
-
-### Memory Map
-
-| Address | Purpose |
-|---------|---------|
-| 0 | Cursor offset (0–55) |
-| 1–32 | Input buffer (characters) |
-| 33 | Input buffer length |
-| 34+ | OS working data |
-| 200–255 | Video RAM |
-| 260 | Keyboard buffer |
+## 5. Legacy OS Shell Architecture
 
 ### Boot Sequence
 
 ```
 start:
-    LOAD R3 0          # R3 = 0 (convention: always zero)
+    LOAD R3 0          # R3 = 0 (convention)
     CALL cls           # Clear display
-    CALL banner         # Print "Trishell!"
+    CALL banner        # Print "Trishell!"
     CALL prompt        # Print "> "
 ```
 
@@ -246,116 +205,64 @@ main:
     JZ main            # No → keep polling
     STOREM 260 R3      # Acknowledge
     CALL kbd           # Process key
-    JMP main           # Loop
-```
-
-### Input Buffer
-
-```
-bufadd:  Append R1 to buffer[1..32], increment length
-bufpop:  Remove last character, decrement length
-bufclr:  Reset length to 0
-```
-
-### Command Parsing (exec)
-
-The `exec` routine reads buffer[1] and dispatches:
-
-```
-exec:
-    LOADM 1 R1           # First character
-    'H' → check HELP...
-    'M' → check MEMDUMP...
-    'R' → check REGS/RUN...
-    'C' → check CLS...
-    else → print "?"
+    JMP main
 ```
 
 ### Commands
 
 | Command | Handler | Output |
 |---------|---------|--------|
-| `HELP` | `help` | Lists commands: "HELP - CLS MEMDUMP REGS RUN" |
+| `HELP` | `help` | Lists commands |
 | `MEMDUMP` | `mem` | Dumps memory addresses 0–7 |
 | `REGS` | `regs` | Shows R0–R3 values |
 | `RUN` | `run_` | Prints "RUN!" |
 | `CLS` | `cls` | Clears screen, resets cursor |
-| *(other)* | `unk` | Prints "?" |
 
-### Key Handlers
+### Key Injection (Python)
 
-```
-kent (Enter):
-    CALL vput           # Echo newline
-    CALL exec           # Execute command
-    CALL prompt         # Print "> "
-    CALL bufclr         # Clear buffer
-    RET
-
-kbsp (Backspace, ASCII 127):
-    CALL bufpop         # Remove from buffer
-    CALL vdec           # Decrement cursor
-    CALL vput           # Write space (erase char on screen)
-    CALL vdec           # Decrement cursor again
-    RET
+```python
+os = OS()
+os.boot()
+os.feed_key('H')
+os.feed_key(chr(10))    # Enter
+os.feed_key(chr(127))   # Backspace
 ```
 
+---
 
-## 5. Pixel Display
+## 6. Framebuffer Display Architecture
 
-The `PixelDisplay` class provides a separate 27×27 pixel framebuffer for graphics.
+### Files
 
-### Specifications
+| File | Purpose |
+|------|---------|
+| `display/constants.py` | VRAM addresses, display dimensions |
+| `display/palette.py` | 9-color palette (RGB tuples) |
+| `display/framebuffer.py` | 64×64 framebuffer with dirty tracking |
+| `display/display_controller.py` | Bridges CPU memory ↔ framebuffer |
+| `display/display_widget.py` | PyQt6 rendering widget (retro aesthetic) |
+| `display/keyboard.py` | Memory-mapped keyboard I/O |
 
-| Property | Value |
-|----------|-------|
-| Width | 27 pixels |
-| Height | 27 pixels |
-| Colors | 0 = black, 1 = gray, 2 = white |
-| Drawing | Bresenham line algorithm |
+### Retro Aesthetic
 
-### API
+The display widget renders at 8× pixel scale with optional scanlines and pixel-grid lines. Uses nearest-neighbour filtering (no blur). Auto-refresh at ~30 FPS.
+
+### Pixel Display (Legacy Graphics)
+
+The `PixelDisplay` class provides a separate 27×27 pixel framebuffer for legacy graphics demos.
 
 ```python
 from trinary.display import PixelDisplay
 
 display = PixelDisplay()
-
-display.set_pixel(x, y, color)     # Set individual pixel
-color = display.get_pixel(x, y)    # Read pixel (0 for OOB)
-display.clear()                    # All black
-display.draw_line(x0, y0, x1, y1, color)  # Bresenham line
+display.set_pixel(x, y, color)
+display.draw_line(x0, y0, x1, y1, color)
 buffer = display.get_buffer()      # 27×27 int matrix
 ```
 
-### Demo Programs
+---
 
-```python
-# Diagonal line
-display2 = display(0, 0, 26, 26, 2)
-
-# Checkerboard (3×3 blocks)
-for i in range(9):
-    for j in range(9):
-        cx, cy = (i % 3) * 3, (j % 3) * 3
-        color = ((i // 3) + (j // 3)) % 3
-        for dx in range(3):
-            for dy in range(3):
-                display.set_pixel(cx + dx, cy + dy, color)
-
-# Smiley face
-for x in range(27):
-    for y in range(27):
-        dist = ((x-13)**2 + (y-13)**2) ** 0.5
-        if dist < 12:
-            display.set_pixel(x, y, 1)  # face
-# Eyes, mouth...
-```
-
-
-## 6. Assembler Character Helpers
-
-When writing OS-level assembly, these Python helpers generate character constants:
+## 7. Assembler Character Helpers
 
 ```python
 from trinary.conversion import decimal_to_ternary as d2t
@@ -363,26 +270,15 @@ from trinary.conversion import decimal_to_ternary as d2t
 def _t(ch):
     return d2t(ord(ch))
 
-# Common characters and their ternary values:
+_t("H")   # "2200"  (72)
+_t("e")   # "11020" (101)
 _t(" ")   # "1012"  (32)
 _t("!")   # "1020"  (33)
-_t(">")   # "2022"  (62)
-_t("?")   # "2100"  (63)
-_t("C")   # "2111"  (67)
-_t("D")   # "2112"  (68)
-_t("E")   # "2120"  (69)
-_t("G")   # "2122"  (71)
-_t("H")   # "2200"  (72)
-_t("L")   # "2211"  (76)
-_t("M")   # "2212"  (77)
-_t("N")   # "2220"  (78)
-_t("P")   # "2222"  (80)
-_t("R")   # "10001" (82)
-_t("S")   # "10002" (83)
-_t("U")   # "10011" (85)
+```
 
-# Line drawing characters:
-d2t(200)  # "21102" — VRAM base address
+Common VRAM addresses:
+```python
+d2t(200)  # "21102" — VRAM base
 d2t(248)  # "100012" — last row start
 d2t(256)  # "100111" — one past VRAM end
 ```

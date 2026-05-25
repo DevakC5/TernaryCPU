@@ -479,11 +479,63 @@ CPU
 
 ---
 
-## Future Directions
+# Devlog 013 — v2.0.0 Release: Full Hardware Simulation, SDK, AI/ML
 
-* assembler
-* symbolic labels
-* machine code encoding
-* debugger
-* instruction tracing
-* ternary executable format
+## Overview
+
+Released v2.0.0 — a major expansion from 113 to 594 tests, adding entire subsystems for hardware microarchitecture simulation, a Fantasy Console SDK, tensor coprocessor, GPU mode, TAL compiler, native C backend, and much more.
+
+## New Subsystems
+
+### Hardware Microarchitecture (cycle-accurate)
+- 5-stage pipeline (IF→ID→EX→MEM→WB) with hazard detection, forwarding, stalls
+- Direct-mapped L1 cache with hit/miss tracking and write-back
+- 2-bit saturating counter branch predictor
+- Shared system bus with priority arbitration
+- Async DMA transfers concurrent with CPU
+- VRAM controller with bandwidth limits and scanline timing
+- 8-line priority interrupt controller with masking and nesting
+- Profiler: CPI, IPC, cache rates, branch accuracy, CSV export
+
+### Tensor Accelerator Coprocessor
+- 6 new ISA opcodes: TLOADW, TSTOREW, TVECADD, TMATMUL, TDOT, TACT
+- Register-based tensor IDs, result → R0
+- GPU mode with ProcessingElement → Workgroup → TernaryGPU hierarchy
+- SIMD processor with vector lanes
+- Packed trit storage for memory efficiency
+
+### Fantasy Console SDK
+- Engine + Runtime with fixed-timestep game loop (30 FPS)
+- Sprite class with transparency, flip, 8×8 pixel art
+- TileMap with camera scrolling and collision detection
+- Animation system (frame-based, play/stop/pause)
+- Input API with 8-button mapping (btn/btnp)
+- Audio stub (sfx)
+- Cartridge format (JSON serialization)
+- 8 demo games: Pong, Snake, Breakout, Particles, Paint, Bouncing Logo, Tilemap, RPG
+
+### TAL Compiler
+- Structured language → ternary assembly
+- if_eq/if_ne, inc/dec/add/sub, draw/clear pixel
+- Array access, I/O ports
+- Snake game compiled to 524 instructions
+
+### Native C Backend
+- libternary.so via ctypes
+- 5× speedup on ALU operations
+- Auto-detection and Python fallback
+
+### Dual OS Paths
+- Legacy: os.py (342-instruction TTY shell, text display)
+- SDK: os/ package (Kernel/Shell/Terminal, framebuffer display)
+
+### PyQt6 UI Expansion
+- 8 new widgets: pipeline, cache, bus, branch, performance, timeline, waveform, debugger
+- Game window for SDK games
+- 15+ demo programs
+
+## Stats
+- 27 opcodes (up from 21)
+- 594 tests (up from 113)
+- ~28,000 lines of code
+- All tests passing

@@ -1,6 +1,6 @@
 # Instruction Set Reference
 
-Complete technical reference for all 26 Trinary CPU instructions.
+Complete technical reference for all 27 Trinary CPU instructions.
 
 ---
 
@@ -14,6 +14,7 @@ Complete technical reference for all 26 Trinary CPU instructions.
 | D | Branch | `OP address` | opcode(3) + addr(variable) | `CALL 4` → `11211` |
 | E | No-Operand | `OP` | opcode(3) | `HALT` → `121` |
 | M | Memory | `OP address R_reg` | opcode(3) + reg(1) + addr(variable) | `STOREM 33 R0` → `20101020` |
+| T | Tensor | `OP operands...` | opcode(3) + raw operands | `TLOADW 100 2 2` → `22110022` |
 
 ### Register Encoding
 
@@ -250,7 +251,7 @@ Element-wise ternary AND between two registers. Operands are padded to equal len
 **Truth table:** `tand(a, b) = min(a, b)` where 0=false, 1=neutral, 2=true.
 
 | A | B | Result |
-|---|---|--------|
+|---|---|---|
 | 0 | 0 | 0 |
 | 0 | 1 | 0 |
 | 0 | 2 | 0 |
@@ -284,7 +285,7 @@ Element-wise ternary OR between two registers. Operands are padded to equal leng
 **Truth table:** `tor(a, b) = max(a, b)`.
 
 | A | B | Result |
-|---|---|--------|
+|---|---|---|
 | 0 | 0 | 0 |
 | 0 | 1 | 1 |
 | 0 | 2 | 2 |
@@ -801,6 +802,252 @@ After HALT, `CPU.step()` returns without fetching/executing further. `CPU.run()`
 
 ---
 
+## Accelerator Coprocessor Instructions
+
+The Tensor Accelerator Coprocessor is a hardware unit integrated with the CPU that provides vector, matrix, and tensor operations using ternary arithmetic. The accelerator maintains its own tensor memory with allocation and shape tracking.
+
+Operands for all tensor instructions can be immediate numbers or registers (R0–R3). When a register name is given, its decimal value is used as the operand. Results are stored in the accelerator's internal tensor memory; the resulting tensor ID (TID) is written into CPU register `R0` (converted via `decimal_to_ternary`).
+
+### TLOADW — Load Tensor from CPU Memory
+
+```
+TLOADW addr rows cols
+```
+
+Loads a tile of CPU memory into the accelerator. Reads `rows × cols` consecutive values starting at `addr` from CPU memory, allocates a new tensor in accelerator memory, and stores the resulting TID in `R0`.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 10 |
+| Flags affected | None |
+
+**Operands:**
+- `addr` — Starting CPU memory address (immediate or register)
+- `rows` — Number of rows (immediate or register)
+- `cols` — Number of columns (immediate or register)
+
+**Behavior:**
+```python
+data = [memory.load(addr + i) for i in range(rows * cols)]
+tid = accel.memory.allocate(data, shape=(rows, cols))
+R0 = decimal_to_ternary(tid)
+```
+
+**Examples:**
+```asm
+# Load a 2x2 block from memory address 100
+TLOADW 100 2 2       # Tensor loaded, TID → R0
+
+# Using registers for operands
+LOAD R0 100
+LOAD R1 2
+LOAD R2 2
+TLOADW R0 R1 R2      # Equivalent: load 2x2 from addr 100
+```
+
+---
+
+### TSTOREW — Store Tensor to CPU Memory
+
+```
+TSTOREW tid addr
+```
+
+Stores an accelerator tensor back into CPU memory. Reads tensor data from accelerator memory by TID and writes consecutive values starting at `addr`.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 10 |
+| Flags affected | None |
+
+**Operands:**
+- `tid` — Tensor ID in accelerator memory (immediate or register)
+- `addr` — Starting CPU memory address (immediate or register)
+
+**Behavior:**
+```python
+data = accel.memory.load_list(tid)
+for i, v in enumerate(data):
+    memory.store(addr + i, str(v))
+```
+
+**Examples:**
+```asm
+# Store tensor with TID 0 to memory address 200
+TSTOREW 0 200
+
+# Using registers
+LOAD R0 0
+LOAD R1 200
+TSTOREW R0 R1
+```
+
+---
+
+### TVECADD — Vector Add
+
+```
+TVECADD dst src_a src_b
+```
+
+Performs element-wise ternary vector addition on the accelerator. Loads two source tensors by TID, adds corresponding elements using `TritSIMD.add_vectors`, allocates the result as a new tensor, and writes its TID to `R0`.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 4 |
+| Flags affected | None |
+
+**Operands:**
+- `dst` — Result tensor ID (immediate or register; currently unused as new TID is allocated and stored in R0)
+- `src_a` — First source tensor TID (immediate or register)
+- `src_b` — Second source tensor TID (immediate or register)
+
+**Behavior:**
+```python
+a = accel.memory.load_list(src_a)
+b = accel.memory.load_list(src_b)
+result = TritSIMD.add_vectors(a, b)
+tid = accel.memory.allocate(result)
+R0 = decimal_to_ternary(tid)
+```
+
+**Examples:**
+```asm
+TLOADW 100 2 2       # Load tensor A (TID in R0)
+MOV R1 R0            # Save TID to R1
+TLOADW 108 2 2       # Load tensor B (TID in R0)
+MOV R2 R0            # Save TID to R2
+TVECADD 0 R1 R2      # Element-wise add, result TID → R0
+```
+
+---
+
+### TMATMUL — Matrix Multiply
+
+```
+TMATMUL dst src_a src_b
+```
+
+Performs matrix multiplication on the accelerator. Loads two source tensors by TID (as 2D matrices via `load_2d`), multiplies them using `TensorCore.matmul`, allocates the flattened result as a new tensor with the computed shape, and writes its TID to `R0`.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 20 |
+| Flags affected | None |
+
+**Operands:**
+- `dst` — Result tensor ID (immediate or register; allocated new)
+- `src_a` — First source tensor TID (immediate or register)
+- `src_b` — Second source tensor TID (immediate or register)
+
+**Behavior:**
+```python
+mat_a = accel.memory.load_2d(src_a)
+mat_b = accel.memory.load_2d(src_b)
+result = accel.core.matmul(mat_a, mat_b)
+flat = [v for row in result for v in row]
+tid = accel.memory.allocate(flat, shape=(len(result), len(result[0])))
+R0 = decimal_to_ternary(tid)
+```
+
+**Examples:**
+```asm
+TLOADW 100 2 2       # Load 2x2 matrix A (TID in R0)
+MOV R1 R0
+TLOADW 104 2 2       # Load 2x2 matrix B (TID in R0)
+MOV R2 R0
+TMATMUL 0 R1 R2      # Matrix multiply, result TID → R0
+TSTOREW R0 200       # Store result to CPU memory at addr 200
+```
+
+---
+
+### TDOT — Dot Product
+
+```
+TDOT src_a src_b
+```
+
+Computes the dot product of two vectors on the accelerator. Loads two source tensors by TID, computes their dot product via `TritSIMD.dot_product`, and writes the scalar result (ternary-encoded) into CPU register `R0`.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 6 |
+| Flags affected | None |
+
+**Operands:**
+- `src_a` — First source tensor TID (immediate or register)
+- `src_b` — Second source tensor TID (immediate or register)
+
+**Behavior:**
+```python
+a = accel.memory.load_list(src_a)
+b = accel.memory.load_list(src_b)
+result = TritSIMD.dot_product(a, b)
+R0 = decimal_to_ternary(result)
+```
+
+**Examples:**
+```asm
+TLOADW 100 4 1       # Load 4-element vector A (TID in R0)
+MOV R1 R0
+TLOADW 104 4 1       # Load 4-element vector B (TID in R0)
+MOV R2 R0
+TDOT R1 R2           # Dot product, scalar result → R0
+```
+
+---
+
+### TACT — Activation
+
+```
+TACT tid type
+```
+
+Applies an activation function in-place on a tensor in accelerator memory. Loads the tensor by TID, applies the selected activation element-wise, and stores the result back into the same tensor slot.
+
+| Field | Description |
+|-------|-------------|
+| Format | T |
+| Cycles | 3 |
+| Flags affected | None |
+
+**Operands:**
+- `tid` — Tensor ID (immediate or register)
+- `type` — Activation type: `0` = step function (immediate or register)
+
+**Activation types:**
+
+| Value | Function | Description |
+|-------|----------|-------------|
+| 0 | Step | `1 if x >= 0 else 0` (ternary threshold) |
+
+**Behavior:**
+```python
+data = accel.memory.load_list(tid)
+if type == 0:
+    result = TritSIMD.ternary_threshold(data)
+accel.memory.store(tid, result)
+```
+
+**Examples:**
+```asm
+TLOADW 100 4 1       # Load vector (TID in R0)
+MOV R1 R0
+TACT R1 0            # Apply step activation in-place
+
+# Using register for type
+LOAD R2 0
+TACT R1 R2           # Equivalent: step activation
+```
+
+---
+
 ## Instruction Cycle Costs
 
 | Opcode | Cycles | Notes |
@@ -823,7 +1070,7 @@ After HALT, `CPU.step()` returns without fetching/executing further. `CPU.run()`
 | RET | 3 | Call stack pop + jump |
 | HALT | 1 | |
 | MUL | 3 | |
-| DIV | 5 | Most expensive instruction |
+| DIV | 5 | Most expensive standard instruction |
 | STOREM | 2 | Memory write |
 | LOADM | 2 | Memory read |
 | INT | 2 | Stack push + IVT lookup |
@@ -832,6 +1079,12 @@ After HALT, `CPU.step()` returns without fetching/executing further. `CPU.run()`
 | DI | 1 | |
 | SETIVT | 1 | |
 | SETTIMER | 1 | |
+| TACT | 3 | Activation in-place |
+| TVECADD | 4 | Element-wise vector add |
+| TDOT | 6 | Dot product |
+| TLOADW | 10 | Load CPU memory → accelerator tensor |
+| TSTOREW | 10 | Store accelerator tensor → CPU memory |
+| TMATMUL | 20 | Matrix multiply (most expensive overall) |
 
 Cycle costs affect timer interrupts: the timer counter decrements by `CYCLES[opcode]` each step.
 
@@ -844,6 +1097,7 @@ DATA MOVEMENT                    STACK
   LOAD R_dst value      [1]       PUSH R_src            [2]
   MOV R_dst R_src       [1]       POP R_dst             [2]
   CLR R_dst             [1]
+
                                   SUBROUTINES
 ARITHMETIC                        CALL address          [3]
   ADD R_dst R_src        [1]      RET                   [3]
@@ -864,6 +1118,13 @@ CONTROL FLOW                      TIMER
   JZ address             [1]
   JNZ address            [1]     SYSTEM
                                   HALT                  [1]
+                                  TENSOR ACCELERATOR
+                                    TACT tid type       [3]
+                                    TVECADD d a b       [4]
+                                    TDOT a b            [6]
+                                    TLOADW a r c       [10]
+                                    TSTOREW t a        [10]
+                                    TMATMUL d a b      [20]
 ```
 
 ## Flag Reference

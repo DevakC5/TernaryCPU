@@ -327,3 +327,125 @@
 - Low-level graphics tests (`demo_graphics.py`): pixel test, color bars, moving pixel, bouncing box — direct `Framebuffer` manipulation, not part of the demo_games launcher
 - Default sprites (`DEFAULT_SPRITES`) ship with the SDK: ball, paddle, player, brick, and a full ASCII character sheet. Custom sprites can be built with `make_sprite_from_strings`
 - This chapter's code: launching any SDK game, inspecting its state and framebuffer, extending a game with new behaviour
+
+---
+
+## Chapter 27 — The TAL Compiler
+
+- Purpose: a higher-level structured language that compiles down to ternary CPU assembly
+- The `tal.py` module: tokenizer, parser, code generator in a single pass
+- Control structures: `if_eq` / `if_ne` for conditional branching with automatic label generation
+- Arithmetic helpers: `inc` / `dec` / `add` / `sub` operating on named variables mapped to memory addresses
+- Pixel graphics: `draw` and `clear` pixel commands for the memory-mapped framebuffer
+- Array access: `body_x` / `body_y` notation for indexed memory access into circular buffers
+- Label syntax: `name:` (not `label name:`) with address constants in `@addr` notation resolved during compilation
+- The snake game: 524 TAL-compiled instructions running entirely on the ternary CPU
+- `TALSnake` class: drop-in replacement for `CPUSnake` via `init()` / `update()` / `render()` / `shutdown()`
+- This chapter's code: writing a TAL program, compiling it to assembly, and running it on the CPU
+
+---
+
+## Chapter 28 — Native C Backend
+
+- Motivation: pure Python ALU operations are too slow for compute-intensive workloads
+- The C native layer: `libternary.so` implementing ALU ops in compiled C for 10–50× speedup
+- ctypes bridge: `native_backend.py` auto-detects the shared library at import time
+- `NATIVE_AVAILABLE` flag: callers check whether acceleration loaded and fall back to pure Python
+- Building: `make -C src/trinary/native` or `bash build_native.sh` produces the shared library
+- Performance benchmark: `python -m trinary.native_benchmark` comparing Python vs C throughput
+- Benchmark results: C accelerates ALU-heavy workloads, especially MUL and DIV which dominate cycle costs
+- This chapter's code: running the native benchmark, inspecting fallback behaviour
+
+---
+
+## Chapter 29 — The Dual Display System
+
+- Two independent display subsystems coexist, each with its own VRAM range and feature set
+- **Text mode** (legacy): VRAM addresses 200–255, 56 characters arranged in a 7×8 grid. Backward compatible with all original CPU programs and the OS shell. Uses the `DisplayMemoryMap` class for read/write/clear operations
+- **Framebuffer mode** (SDK): VRAM addresses 1000–5095, 64×64 pixel grid with 9-color palette (0–8). Uses the `Framebuffer` class with per-pixel set/get/clear, horizontal and vertical line drawing, and rectangle fill
+- Keyboard input at address 260 (text mode) vs addresses 9000–9001 (framebuffer mode, with 8-button D-pad mapping)
+- Display subsystem refactored from a single `display.py` into the `display/` package — imports use `from trinary.display import ...`
+- CPU default `Memory(512)` only covers text mode; framebuffer SDK path passes `CPU(memory=Memory(10000))`
+- This chapter's code: writing text to the text display, drawing pixels to the framebuffer, running both simultaneously
+
+---
+
+## Chapter 30 — The Fantasy Console SDK
+
+- Architecture: `Engine` + `Runtime` split — the Engine owns state and peripherals, the Runtime runs the game loop
+- `Engine` class: wraps a `Framebuffer` (64×64), a `Memory(10000)` with mapped VRAM, a `Keyboard` at 9000–9001, and a plain `state` dictionary for game data
+- `Runtime` class: provides the canonical game loop — `update()` → `render()` → vsync (with `pygame.time.Clock` or `time.sleep`). Supports variable `target_fps` and optional `cpu_sync` for CPU-driven games
+- `Sprite` class: 8×8 pixel art with per-pixel transparency (color 8 = transparent). Construction via 8-string arrays, hex strings, or `ints_from_hex`. Sprites render with optional flip and scale. `DEFAULT_SPRITES` ships ball, paddle, player, brick, and a 95-character ASCII sheet
+- `TileMap` class: 2D grid of tile indices with `camera_x` / `camera_y` scrolling. `render(fb)` draws visible tiles, `is_solid(x, y)` checks collision against a solid-tile set. Tile dimensions are 8×8 pixels by default
+- `Animation` class: frame-based playback with a list of (sprite, duration) frames. Supports `play`, `stop`, `pause`, `next_frame`, `reset`. Tracks elapsed time via `update(dt)`. Works with any sprite sheet split into frames
+- Input API: `btn(button)` returns pressed state, `btnp(button)` returns edge-triggered (just pressed). 8-button mapping: U (up), D (down), L (left), R (right), A, B, X, Y. Backed by the `Keyboard` class reading from memory at 9000–9001
+- Audio: `sfx(sound_id, channel=0)` — stub system with placeholder. Accepts sound IDs and channels but no audio backend yet. Future expansion point for waveform synthesis
+- `Cartridge` class: JSON-bundled game data packing sprites, tilemaps, palettes, metadata, and code as a portable file. Export/import with `save(path)` / `load(path)`
+- 8 built-in demo games: Pong, Snake Deluxe, Breakout, Particle System, Pixel Paint, Bouncing Logo, Tilemap Scroller, RPG Movement
+- This chapter's code: building a complete game from scratch using the SDK, loading a cartridge
+
+---
+
+## Chapter 31 — The Tensor Accelerator Coprocessor
+
+- Purpose: offload compute-intensive linear algebra to dedicated hardware, freeing the CPU for control flow
+- Module: `src/trinary/accelerator/` containing the accelerator, GPU mode, tensor core, SIMD, visualization, and packed storage
+- 6 tensor ISA opcodes integrated into the CPU, assembler, and machine encoder:
+  - `TLOADW addr rows cols` — load CPU memory into accelerator, returns tensor ID in R0
+  - `TSTOREW tid addr` — store accelerator tensor back to CPU memory
+  - `TVECADD dst src_a src_b` — element-wise vector addition, result TID in R0
+  - `TMATMUL dst src_a src_b` — matrix multiplication, result TID in R0
+  - `TDOT src_a src_b` — dot product, scalar result in R0 (ternary-encoded)
+  - `TACT tid type` — in-place activation (type 0 = step function)
+- Operands support immediate numbers or registers (R0–R3), with R0 reading the result TID via `decimal_to_ternary`
+- Integration with the CPU pipeline: tensor instructions follow the same fetch-decode-execute cycle, dispatching to the accelerator coprocessor
+- 70 unit tests for the accelerator, 11 CPU integration tests
+- This chapter's code: writing tensor programs, running TVECADD and TMATMUL, comparing performance with pure CPU implementations
+
+---
+
+## Chapter 32 — Hardware Microarchitecture Simulation
+
+- Purpose: cycle-accurate hardware simulation for educational computer architecture, enabled via `CPU(realistic_timing=True)`
+- **Clock module** (`clock.py`): cycle counter, configurable frequency, period-based timing. Every `step()` consumes one clock cycle
+- **5-stage pipeline** (`pipeline.py`): `PipelineStage` and `Pipeline` classes implementing IF→ID→EX→MEM→WB. Instructions flow through stages each cycle. ASCII pipeline visualizer shows stage occupancy (`pipeline.visualize(cycle=N)`)
+- **Hazard unit** (`hazards.py`): `HazardUnit` detects RAW (read-after-write) hazards, generates forwarding paths to bypass the register file, and inserts stalls (bubbles) when forwarding cannot resolve the hazard
+- **Cache** (`cache.py`): direct-mapped L1 cache with `CacheLine` entries. Tracks hits and misses, write-back policy, configurable size and associativity
+- **Branch predictor** (`branch_predictor.py`): static always-taken / always-not-taken strategies plus dynamic 2-bit saturating counter predictor. Tracks prediction accuracy and mispredict counts
+- **Bus** (`bus.py`): shared system bus with priority-based arbitration, `BusRequest` queue, contention modelling. Handles memory access requests from CPU, DMA, and peripherals
+- **DMA** (`dma.py`): asynchronous memory-to-memory transfers running concurrently with the CPU. `DMATransfer` objects track source, destination, size, and status. DMA cycles are interleaved with CPU cycles on the bus
+- **VRAM controller** (`vram_controller.py`): enforces display bandwidth limits, models scanline timing, provides frame synchronization signals
+- **Interrupt controller** (`interrupts.py`): `InterruptController` with 8 interrupt lines, configurable priority levels, interrupt masking per line, and support for nested interrupt handling
+- **Profiler** (`profiler.py`): collects cycle-by-cycle metrics — CPI (cycles per instruction), IPC (instructions per cycle), cache hit/miss rates, branch prediction accuracy, stall breakdowns. Export to CSV via `profiler.export_csv(path)`
+- All hardware modules are optional and backward-compatible — `CPU()` without `realistic_timing` behaves identically to the original instant-execution emulator
+- 9 CPU integration tests validate realistic-timing mode against known program behaviour
+- This chapter's code: enabling realistic timing, reading profiler reports, viewing pipeline visualizations
+
+---
+
+## Chapter 33 — GPU Mode and Parallel Computing
+
+- Module: `gpu.py` in `src/trinary/accelerator/` — a simulated GPU architecture for parallel computation
+- Three-level hierarchy: `ProcessingElement` → `Workgroup` → `TernaryGPU`
+  - `ProcessingElement`: the smallest compute unit, executes a single kernel thread with local register state
+  - `Workgroup`: a group of PEs sharing local memory and synchronization barriers
+  - `TernaryGPU`: the full GPU with configurable `PEs_per_wg × n_workgroups` processing elements
+- Kernel dispatch: kernels are Python callables distributed across all PEs. Each PE receives its global and local ID plus access to shared workgroup memory
+- Tensor pipelines: GPU-level dispatch for tensor operations (matmul, element-wise ops) with workgroup coordination
+- Parallel matmul: matrix multiplication decomposed into workgroups, each computing a tile of the result matrix. PEs within a workgroup collaborate on tile computation with barrier synchronization
+- ASCII visualization (`viz.py`): `render_simd_lanes`, `render_tensor_matrix`, `render_matmul`, `render_gpu_state` functions for terminal-based inspection of GPU state
+- 19 GPU mode + visualization tests
+- This chapter's code: writing a GPU kernel, dispatching it across workgroups, visualizing parallel execution
+
+---
+
+## Chapter 34 — SIMD and Packed Storage
+
+- **SIMD processor** (`simd.py`): single-instruction multiple-data processor with configurable vector width. Operates on vector registers with lane-level parallelism
+- Vector operations: `vector_add`, `vector_mul`, `vector_dot` — each applies the operation across all lanes simultaneously. Dot product reduces across lanes to a scalar
+- **Packed trit storage** (`packed_trits.py`): memory-efficient encoding of ternary values. Each trit (0, 1, 2) encodes in 2 bits (00, 01, 10) instead of a full Python string. Packing ratio: 4 trits per byte versus 1 trit per Python string character
+- Packing functions: `pack_trits` / `unpack_trits` for byte-level conversion, `packed_to_ternary_string` / `ternary_string_to_packed` for string interop
+- ASCII lane visualization: `render_simd_lanes(trit_values)` displays vector lanes as a horizontal bar with lane indices and trit values
+- SIMD integration with the accelerator: vector ops can dispatch to SIMD lanes for parallel execution
+- 20 packed storage tests, 11 SIMD processor tests, 12 vector ops tests
+- This chapter's code: writing SIMD programs, comparing packed vs unpacked memory usage, visualizing lane execution

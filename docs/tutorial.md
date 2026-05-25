@@ -439,6 +439,375 @@ python -m trinary.ui.app
 
 ---
 
+## Step 13: Fantasy Console SDK
+
+The Fantasy Console SDK provides a high-level game development API with a 64×64 pixel framebuffer, sprites, tilemaps, audio, and input handling.
+
+### Engine and Runtime
+
+Create a game by defining an `Engine` subclass with `init()`, `update()`, and `render()` methods, then run it with `Runtime`.
+
+### Bouncing Ball Example
+
+```python
+from trinary.sdk import Engine, Runtime, Sprite, cls, spr, set_engine
+from trinary.display.framebuffer import Framebuffer
+
+class BouncingBall:
+    def __init__(self):
+        self.fb = Framebuffer()
+        self.eng = Engine(self.fb)
+        self.ball = Sprite.from_strings([
+            "..@..",
+            ".@@@.",
+            "@@@@@",
+            ".@@@.",
+            "..@..",
+        ])
+        self.x, self.y = 32, 32
+        self.dx, self.dy = 1, 1
+
+    def loop(self):
+        self.eng.init()
+        for _ in range(300):
+            self.update()
+            self.render()
+            self.fb.present()
+
+    def update(self):
+        self.x += self.dx
+        self.y += self.dy
+        if self.x <= 0 or self.x >= 59:
+            self.dx = -self.dx
+        if self.y <= 0 or self.y >= 59:
+            self.dy = -self.dy
+
+    def render(self):
+        cls(0)
+        spr(self.ball, self.x, self.y, color_override=2)
+
+set_engine(BouncingBall().eng)
+BouncingBall().loop()
+```
+
+### API Reference
+
+| Function | Description |
+|----------|-------------|
+| `cls(color)` | Clear screen with color |
+| `spr(sprite, x, y)` | Draw sprite at position |
+| `btn(name)` | Check if button is held |
+| `btnp(name)` | Check if button was just pressed |
+| `pixel(x, y, color)` | Set individual pixel |
+| `rect(x, y, w, h, color)` | Draw filled rectangle |
+| `print_text(text, x, y)` | Draw text |
+| `sfx(freq, dur)` | Play audio beep |
+
+### Built-in Demos
+
+```sh
+python -m trinary.demo_games pong
+python -m trinary.demo_games snake
+python -m trinary.demo_games breakout
+python -m trinary.demo_games particles
+python -m trinary.demo_games paint
+python -m trinary.demo_games bouncing_logo
+python -m trinary.demo_games tilemap
+python -m trinary.demo_games rpg
+```
+
+---
+
+## Step 14: TAL Compiler
+
+TAL (Ternary Assembly Language) is a structured high-level language that compiles down to ternary CPU assembly. It provides variables, constants, control flow, and drawing primitives.
+
+### Writing a Simple TAL Program
+
+```tal
+var counter @100
+var result @101
+
+const MAX = 10
+
+label start:
+    store counter, 0
+
+label loop_start:
+    if_eq counter, MAX, done
+    inc counter
+    jmp loop_start
+
+label done:
+    store result, counter
+    halt
+```
+
+### Compile and Run
+
+```python
+from trinary.tal import compile_and_assemble
+from trinary.cpu import CPU
+
+source = """
+var counter @100
+const MAX = 10
+label start:
+    store counter, 0
+label loop:
+    if_eq counter, MAX, done
+    inc counter
+    jmp loop
+label done:
+    halt
+"""
+
+program, labels = compile_and_assemble(source, entry_point="start")
+cpu = CPU()
+cpu.load_program(program)
+cpu.run(verbose=False)
+```
+
+### TAL Instruction Reference
+
+| Instruction | Description |
+|-------------|-------------|
+| `var name @addr` | Declare variable at memory address |
+| `const name = value` | Declare named constant |
+| `store var, value` | Store value into variable |
+| `load var, addr` | Load from address into variable |
+| `inc var` | Increment variable |
+| `dec var` | Decrement variable |
+| `add dst, a, b` | Add two values |
+| `sub dst, a, b` | Subtract two values |
+| `if_eq a, b, label` | Branch if equal |
+| `if_ne a, b, label` | Branch if not equal |
+| `draw x, y, color` | Set pixel on framebuffer |
+| `clear x, y` | Clear pixel on framebuffer |
+| `write addr, value` | Write value to memory address |
+| `jmp label` | Unconditional jump |
+
+### Snake Game in TAL
+
+The snake game (`test_snake_tal.py`) is a complete game written in TAL with 524 compiled instructions. It features a circular buffer for the snake body (memory addresses 20–147), keyboard input (WASD), collision detection, food spawning, and a 64×64 pixel framebuffer display.
+
+```sh
+python test_snake_tal.py
+```
+
+---
+
+## Step 15: Hardware Simulation
+
+The CPU supports a cycle-accurate microarchitecture simulation mode that models a 5-stage pipeline, L1 caches, branch predictor, DMA, bus, interrupt controller, and profiler.
+
+### Enable Realistic Timing
+
+```python
+from trinary.cpu import CPU
+
+cpu = CPU(realistic_timing=True)
+cpu.load_program(["LOAD R0 10", "LOAD R1 12", "ADD R0 R1", "HALT"])
+cpu.run(verbose=False)
+
+print(f"Cycles: {cpu.clock.cycle}")
+print(cpu.profiler.report())
+```
+
+### Pipeline Visualizer
+
+```python
+from trinary.cpu import CPU
+
+cpu = CPU(realistic_timing=True)
+cpu.load_program(["LOAD R0 10", "LOAD R1 12", "ADD R0 R1", "HALT"])
+
+# Step through cycle by cycle
+for i in range(12):
+    cpu.step()
+    print(cpu.pipeline.visualize(cycle=i))
+```
+
+Example output:
+```
+Cycle    0 | IF       | ID       | EX       | MEM      | WB
+       | LOAD R0  | ---     | ---     | ---     | ---
+Cycle    1 | IF       | ID       | EX       | MEM      | WB
+       | LOAD R1  | LOAD R0  | ---     | ---     | ---
+Cycle    2 | IF       | ID       | EX       | MEM      | WB
+       | ADD     | LOAD R1  | LOAD R0  | ---     | ---
+```
+
+### Hardware Components
+
+| Component | Attribute | Description |
+|-----------|-----------|-------------|
+| Clock | `cpu.clock` | Cycle counter with frequency |
+| Pipeline | `cpu.pipeline` | 5-stage IF → ID → EX → MEM → WB |
+| Hazard Unit | `cpu.hazard` | RAW detection, forwarding, stalls |
+| L1 I-Cache | `cpu.icache` | Direct-mapped instruction cache |
+| L1 D-Cache | `cpu.dcache` | Direct-mapped data cache |
+| Branch Predictor | `cpu.bp` | 2-bit saturating counter predictor |
+| Bus | `cpu.bus` | Shared system bus with arbitration |
+| DMA | `cpu.dma` | Async memory-to-memory transfers |
+| Interrupt Controller | `cpu.intc` | 8-line priority controller |
+| VRAM Controller | `cpu.vram` | Bandwidth and scanline timing |
+| Profiler | `cpu.profiler` | CPI, IPC, cache rates, branch accuracy |
+
+### Cache and Branch Statistics
+
+```python
+cpu = CPU(realistic_timing=True)
+cpu.load_program(["LOAD R0 10", "LOAD R1 12", "ADD R0 R1", "HALT"])
+cpu.run(verbose=False)
+
+print(f"Cache hits: {cpu.dcache.hits}, misses: {cpu.dcache.misses}")
+print(f"Branch accuracy: {cpu.bp.accuracy:.1%}")
+print(f"CPI: {cpu.profiler.cpi:.2f}")
+```
+
+---
+
+## Step 16: Tensor Accelerator
+
+The Tensor Accelerator Coprocessor provides hardware-accelerated tensor operations integrated with the CPU ISA. It supports vector addition, matrix multiplication, dot products, and activation functions.
+
+### Assembly-Level Tensor Operations
+
+```asm
+# tensor_demo.asm
+start:
+    # Load a 2x2 matrix from memory address 100
+    TLOADW 100 2 2         # Load tensor, TID → R0
+
+    # Load another 2x2 matrix from address 110
+    TLOADW 110 2 2         # Load tensor, TID → R0
+
+    # Add two vectors
+    MOV R1 R0              # Save first TID
+    TVECADD R2 R1 R0       # R2 = R1 + R0, result TID → R0
+
+    # Matrix multiply
+    TMATMUL R3 R1 R0       # R3 = R1 × R0, result TID → R0
+
+    # Dot product
+    TDOT R1 R0             # Scalar result → R0 (ternary encoded)
+
+    HALT
+```
+
+### Python API
+
+```python
+from trinary.accelerator import TernaryTensorAccelerator, Opcode, Instruction
+
+acc = TernaryTensorAccelerator()
+
+# Load tensors
+tid_a = acc.execute(Instruction(Opcode.TLOAD))
+acc.memory.store(tid_a, [1, 0, 2, 1])  # 2x2 flat
+
+tid_b = acc.execute(Instruction(Opcode.TLOAD))
+acc.memory.store(tid_b, [2, 1, 0, 1])  # 2x2 flat
+
+# Vector add
+result = acc.execute(Instruction(Opcode.TVECADD, dest=0, src_a=tid_a, src_b=tid_b))
+print(result)
+
+# Dot product
+result = acc.execute(Instruction(Opcode.TDOT, src_a=tid_a, src_b=tid_b))
+print(result)
+```
+
+### Visualization
+
+```python
+from trinary.accelerator import render_simd_lanes, render_tensor_matrix, render_matmul
+
+print(render_simd_lanes([2, 0, 1, 2]))
+print(render_tensor_matrix([[2, 0], [0, 2]]))
+print(render_matmul([[2, 0], [0, 2]], [[2, 0], [0, 2]], result=[[2, 0], [0, 2]]))
+```
+
+### Tensor ISA Opcodes
+
+| Opcode | Format | Description |
+|--------|--------|-------------|
+| `TLOADW` | `TLOADW addr rows cols` | Load from CPU memory into accelerator tensor |
+| `TSTOREW` | `TSTOREW tid addr` | Store accelerator tensor to CPU memory |
+| `TVECADD` | `TVECADD dst src_a src_b` | Element-wise vector add |
+| `TMATMUL` | `TMATMUL dst src_a src_b` | Matrix multiply |
+| `TDOT` | `TDOT src_a src_b` | Dot product (scalar → R0) |
+| `TACT` | `TACT tid type` | Activation (0 = step) |
+
+---
+
+## Step 17: Native C Backend
+
+The native C backend accelerates ALU operations using a shared library (`libternary.so`). It auto-detects the library at import time and falls back to pure Python if unavailable.
+
+### Building the Library
+
+```sh
+make -C src/trinary/native
+```
+
+This produces `src/trinary/libternary.so` containing C implementations of ternary arithmetic.
+
+### Auto-Fallback Mechanism
+
+```python
+from trinary.native_backend import NATIVE_AVAILABLE, native_add, native_sub
+
+if NATIVE_AVAILABLE:
+    result = native_add(1, 2)  # 10 in ternary
+    print(f"Native C add: {result}")
+else:
+    print("Native backend not available — using pure Python fallback")
+```
+
+The flag `NATIVE_AVAILABLE` is set at import time. The library is searched in multiple paths:
+
+1. `src/trinary/libternary.so`
+2. `src/trinary/native/libternary.so`
+3. System library path
+
+### Benchmark
+
+Run a performance comparison between Python and native C:
+
+```sh
+python -m trinary.native_benchmark
+```
+
+Example output:
+```
+==================================================
+TERNARY CPU — Native Backend Benchmark
+Operations per test: 1,000,000
+==================================================
+
+Python add: 0.123s
+Native add: 0.015s
+Speedup: 8.2x
+
+Python full_adder: 0.245s
+Native full_adder: 0.019s
+Speedup: 12.9x
+```
+
+### Exposed C Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `ternary_add` | `int ternary_add(int a, int b)` | Ternary digit addition |
+| `ternary_sub` | `int ternary_sub(int a, int b)` | Ternary digit subtraction |
+| `ternary_mul` | `int ternary_mul(int a, int b)` | Ternary digit multiplication |
+| `ternary_div` | `int ternary_div(int a, int b)` | Ternary digit division |
+| `ternary_full_adder` | `int ternary_full_adder(int a, int b, int carry_in, int* carry_out)` | Full adder with carry |
+
+---
+
 ## Next Steps
 
 - Read [instruction-set.md](instruction-set.md) for complete opcode reference
@@ -448,3 +817,10 @@ python -m trinary.ui.app
 - Study the demo programs in `demo_programs.py`
 - Write your own assembly programs and run them with the CPU
 - Extend the OS shell with new commands
+- Build your own games using the Fantasy Console SDK (`src/trinary/sdk/`)
+- Explore the TAL compiler in `src/trinary/tal.py` and `test_snake_tal.py`
+- Experiment with realistic timing: `CPU(realistic_timing=True)` and study pipeline, cache, branch predictor behavior
+- Accelerate matrix workloads with tensor opcodes: `TLOADW`, `TVECADD`, `TMATMUL`, `TDOT`
+- Build the native C backend and benchmark: `make -C src/trinary/native && python -m trinary.native_benchmark`
+- Dive into the hardware simulation modules in `src/trinary/hardware/`
+- Run the full test suite: `python -m pytest tests/ -v`

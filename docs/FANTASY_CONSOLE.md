@@ -1,6 +1,6 @@
 # Trinary Fantasy Console — SDK Documentation
 
-The Trinary Fantasy Console brings retro game development to the ternary computer. Inspired by PICO-8, TIC-80, and CHIP-8, it provides a sprite engine, tilemap system, animation API, and game loop runtime — all running on the Trinary CPU simulator.
+The Trinary Fantasy Console brings retro game development to the ternary computer. Inspired by PICO-8, TIC-80, and CHIP-8, it provides a sprite engine, tilemap system, animation API, audio, and game loop runtime — all running on the Trinary CPU simulator with a 64×64 pixel framebuffer.
 
 ## Architecture Overview
 
@@ -56,8 +56,6 @@ The Runtime uses a fixed timestep accumulator pattern. At 30 FPS, each tick is ~
 
 ### Sprite Class
 
-The `Sprite` class represents a pixel art image:
-
 ```python
 from trinary.sdk.api import Sprite
 
@@ -97,7 +95,7 @@ spr(DEFAULT_SPRITES["ball"], x, y)
 
 ### Blitting and Transparency
 
-- `sprite.blit_to(fb, x, y)` — draw onto framebuffer; pixels matching `transparent` (-1) are skipped
+- `sprite.blit_to(fb, x, y)` — draw onto framebuffer; transparent pixels (value -1) are skipped
 - `sprite.copy()` — deep copy
 - `sprite.flip_h()` / `sprite.flip_v()` — mirror
 - `sprite.fill(color)` — fill all pixels
@@ -113,20 +111,20 @@ tm = TileMap(32, 32)          # 32×32 tile grid
 tm.set_sprite_sheet(sprites)  # tile ID → sprite mapping
 tm.set_tile(col, row, id)     # place tile
 tm.set_collision(col, row)    # mark as solid
-tm.camera_x = 16              # scroll camera
+tm.camera_x = 16
 tm.camera_y = 8
 
 # In render:
 tm.render(fb)                 # draw visible tiles only
 
 # Collision:
-if tm.is_solid(tx, ty):       # blocked?
+if tm.is_solid(tx, ty):
     # handle collision
 ```
 
 ### Tile Coordinates
 
-- `tilemap.pixel_to_tile(px, py)` → `(col, row)` — pixel-space to grid
+- `tilemap.pixel_to_tile(px, py)` → `(col, row)`
 - Tiles are 8×8 pixels by default
 - Only tiles within the camera viewport are rendered (frustum culling)
 
@@ -135,17 +133,15 @@ if tm.is_solid(tx, ty):       # blocked?
 ```python
 from trinary.sdk.api import Animation
 
-# Frame-by-frame animation
 walk = Animation(
     frames=[sprite1, sprite2, sprite3, sprite4],
-    frame_duration=6,  # ticks per frame
+    frame_duration=6,
     loop=True,
 )
 
 walk.play()
 # In update:
 walk.update()
-
 # In render:
 spr(walk.current_frame(), x, y)
 ```
@@ -161,16 +157,16 @@ spr(walk.current_frame(), x, y)
 
 ### Button Mapping
 
-| Button  | Key         | Function     |
-|---------|-------------|--------------|
-| LEFT    | A / ←      | `btn("LEFT")`  |
-| RIGHT   | D / →      | `btn("RIGHT")` |
-| UP      | W / ↑      | `btn("UP")`    |
-| DOWN    | S / ↓      | `btn("DOWN")`  |
-| A       | Z / Space   | `btn("A")`     |
-| B       | X / Shift   | `btn("B")`     |
-| START   | Enter       | `btn("START")` |
-| SELECT  | Escape      | `btn("SELECT")`|
+| Button | Key | Function |
+|--------|-----|----------|
+| LEFT | A / ← | `btn("LEFT")` |
+| RIGHT | D / → | `btn("RIGHT")` |
+| UP | W / ↑ | `btn("UP")` |
+| DOWN | S / ↓ | `btn("DOWN")` |
+| A | Z / Space | `btn("A")` |
+| B | X / Shift | `btn("B")` |
+| START | Enter | `btn("START")` |
+| SELECT | Escape | `btn("SELECT")` |
 
 ```python
 from trinary.sdk.api import btn, btnp
@@ -179,15 +175,17 @@ if btn("LEFT"):   x -= 1    # held
 if btnp("A"):     jump()     # single press
 ```
 
-Input reads from CPU memory address 9000 (the keyboard register).
+Input reads from CPU memory address 9000 (keyboard data register) and 9001 (keyboard status register).
 
 ## Audio
 
-The audio system is currently a stub. `sfx(freq, dur)` stores sound requests but does not play them yet. A future mixer will support:
+```python
+from trinary.sdk.api import sfx
 
-- Square wave beeps
-- Named sound effects
-- Channel-based mixing
+sfx(freq=440, duration=0.1)    # Queue a beep
+```
+
+The audio system is currently a stub. Sound requests are stored but not yet mixed. A future mixer will support square wave beeps, named sound effects, and channel-based mixing.
 
 ## Cartridge Format
 
@@ -204,10 +202,10 @@ Cartridges bundle game code, sprites, tilemaps, and metadata into a single JSON 
     {
       "width": 8,
       "height": 8,
-      "data": [[0,0,2,2,2,2,0,0], [0,2,2,2,2,2,2,0], ...]
+      "data": [[0,0,2,2,2,2,0,0], ...]
     }
   ],
-  "tilemap_data": [[1, 1, 0, 1, 1], [0, 0, 0, 0, 0], ...],
+  "tilemap_data": [[1, 1, 0, 1, 1], ...],
   "tilemap_cols": 32,
   "tilemap_rows": 32,
   "code": "LOAD R0 1\nADD R0 R0\nHALT",
@@ -295,7 +293,7 @@ state = {"x": 32, "y": 32, "dx": 1, "dy": 1}
 
 # 2. Update function
 def update():
-    poll_input(memory)  # read keyboard
+    poll_input(memory)
     state["x"] += state["dx"]
     state["y"] += state["dy"]
     if state["x"] <= 0 or state["x"] >= 48:
@@ -322,8 +320,6 @@ rt.run(update, render)
 
 ## Built-in Demo Games
 
-Run from command line:
-
 ```bash
 python -m trinary.demo_games pong
 python -m trinary.demo_games snake
@@ -331,17 +327,25 @@ python -m trinary.demo_games breakout
 python -m trinary.demo_games particles
 python -m trinary.demo_games paint
 python -m trinary.demo_games bouncing_logo
-python -m trinary.demo_games tilemap_scroller
-python -m trinary.demo_games rpg_movement
+python -m trinary.demo_games tilemap
+python -m trinary.demo_games rpg
 ```
 
 | Demo | Description |
 |------|-------------|
 | Pong | Two-player paddle ball game |
-| Snake | Classic snake with keyboard controls |
+| Snake Classic | Classic snake (TAL-compiled, 524 instructions) |
 | Breakout | Brick-breaking with paddle |
 | Particles | Interactive particle system |
 | Paint | Free-form pixel art |
 | Bouncing Logo | DVD-style bouncing rectangle |
 | Tilemap Scroller | Scrollable 32×32 tile world |
 | RPG Movement | Top-down tilemap with collision |
+
+### TAL-Compiled Snake
+
+The snake game uses the TAL compiler to run entirely on the ternary CPU. Game logic is compiled from structured TAL source (524 instructions). The body is stored in a circular buffer at mem 20–147. Rendering syncs from memory-mapped VRAM.
+
+```sh
+python test_snake_tal.py    # 13 frames of CPU-driven snake
+```
