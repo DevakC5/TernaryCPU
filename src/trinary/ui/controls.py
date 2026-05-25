@@ -25,8 +25,11 @@ class Controls(QWidget):
         self.run_btn = QPushButton("Run")
         self.run_btn.setProperty("cssClass", "run")
 
-        self.step_btn = QPushButton("Step")
+        self.step_btn = QPushButton("Step Into")
         self.step_btn.setProperty("cssClass", "step")
+
+        self.step_over_btn = QPushButton("Step Over")
+        self.step_over_btn.setProperty("cssClass", "step")
 
         self.reset_btn = QPushButton("Reset")
         self.reset_btn.setProperty("cssClass", "reset")
@@ -34,7 +37,32 @@ class Controls(QWidget):
         layout.addWidget(self.assemble_btn)
         layout.addWidget(self.run_btn)
         layout.addWidget(self.step_btn)
+        layout.addWidget(self.step_over_btn)
         layout.addWidget(self.reset_btn)
+
+        layout.addSpacing(8)
+
+        self.pause_btn = QPushButton("Pause")
+        self.pause_btn.setProperty("cssClass", "reset")
+
+        self.continue_btn = QPushButton("Continue")
+        self.continue_btn.setProperty("cssClass", "run")
+
+        layout.addWidget(self.pause_btn)
+        layout.addWidget(self.continue_btn)
+
+        layout.addSpacing(12)
+
+        self.boot_os_btn = QPushButton("Boot TernaryOS")
+        self.boot_os_btn.setProperty("cssClass", "run")
+        layout.addWidget(self.boot_os_btn)
+
+        layout.addSpacing(12)
+
+        self.cycle_label = QLabel("Cycles: 0")
+        self.cycle_label.setProperty("cssClass", "value")
+        layout.addWidget(self.cycle_label)
+
         layout.addStretch()
 
         self.setLayout(layout)

@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #0f3460 #0a0a1a;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0a1a; }
+  ::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #00ff88; }
+
+  body {
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: rgba(10, 10, 26, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(15, 52, 96, 0.5);
+    border-radius: 8px;
+  }
+
+  .neon-border {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.1), inset 0 0 10px rgba(0, 255, 136, 0.05);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+  }
+
+  .cyber-button {
+    @apply px-4 py-2 rounded border font-mono text-sm transition-all duration-200;
+    background: rgba(15, 52, 96, 0.6);
+    border-color: rgba(0, 255, 136, 0.3);
+    color: #00ff88;
+  }
+
+  .cyber-button:hover {
+    background: rgba(0, 255, 136, 0.15);
+    border-color: #00ff88;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+  }
+
+  .cyber-button:active {
+    transform: scale(0.97);
+  }
+
+  .cyber-button.danger {
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff4444;
+  }
+
+  .cyber-button.danger:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: #ff4444;
+    box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+  }
+
+  .cyber-button.primary {
+    border-color: rgba(0, 255, 204, 0.3);
+    color: #00ffcc;
+  }
+
+  .cyber-button.primary:hover {
+    background: rgba(0, 255, 204, 0.15);
+    border-color: #00ffcc;
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .stage-box {
+    @apply rounded border font-mono text-xs flex flex-col items-center justify-center transition-all duration-300;
+    min-width: 80px;
+    min-height: 56px;
+  }
+}
+
+/* CRT scanline overlay */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+.crt-overlay::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.3) 100%);
+}
+
+/* Terminal cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Pipeline stage colors */
+.stage-if { background: rgba(0, 68, 136, 0.6); border-color: #004488; }
+.stage-id { background: rgba(0, 102, 68, 0.6); border-color: #006644; }
+.stage-ex { background: rgba(136, 68, 0, 0.6); border-color: #884400; }
+.stage-mem { background: rgba(68, 0, 136, 0.6); border-color: #440088; }
+.stage-wb { background: rgba(0, 136, 68, 0.6); border-color: #008844; }
+.stage-stall { background: rgba(136, 34, 34, 0.6); border-color: #882222; }
+.stage-flush { background: rgba(204, 68, 0, 0.6); border-color: #cc4400; }
+.stage-bubble { background: rgba(26, 26, 46, 0.6); border-color: #1a1a2e; }
+
+/* Glow keyframes for datapaths */
+@keyframes flow-glow {
+  0% { filter: drop-shadow(0 0 2px #00ff88); }
+  50% { filter: drop-shadow(0 0 8px #00ff88); }
+  100% { filter: drop-shadow(0 0 2px #00ff88); }
+}
+
+.datapath-flow {
+  animation: flow-glow 1.5s ease-in-out infinite;
+}
+
+/* Grid background for visualizers */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(15, 52, 96, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 52, 96, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}

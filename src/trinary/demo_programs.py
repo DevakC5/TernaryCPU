@@ -317,5 +317,160 @@ def run_all_demos():
     print("=" * 60)
 
 
+def demo_pixel_diagonal(display=None):
+    """Draw diagonal lines on a PixelDisplay."""
+    from trinary.display import PixelDisplay
+    p = display if display else PixelDisplay()
+    p.clear()
+    p.draw_line(0, 0, 26, 26, 2)
+    p.draw_line(26, 0, 0, 26, 1)
+    if not display:
+        print("Diagonal lines drawn:")
+        print(p)
+    return p
+
+
+def demo_pixel_checkerboard(display=None):
+    """Draw a 3x3 checkerboard pattern on a PixelDisplay."""
+    from trinary.display import PixelDisplay
+    p = display if display else PixelDisplay()
+    p.clear()
+    for by in range(0, 27, 3):
+        for bx in range(0, 27, 3):
+            val = 1 if ((bx // 3) + (by // 3)) % 2 == 0 else 0
+            for dy in range(3):
+                for dx in range(3):
+                    p.set_pixel(bx + dx, by + dy, val)
+    if not display:
+        print("Checkerboard drawn:")
+        print(p)
+    return p
+
+
+def demo_pixel_smiley(display=None):
+    """Draw a ternary smiley face on a PixelDisplay."""
+    from trinary.display import PixelDisplay
+    p = display if display else PixelDisplay()
+    p.clear()
+    for ey in (8, 9):
+        for ex in (8, 9):
+            p.set_pixel(ex, ey, 2)
+    for ey in (8, 9):
+        for ex in (18, 19):
+            p.set_pixel(ex, ey, 2)
+    for x in range(7, 21):
+        p.set_pixel(x, 16, 2)
+    for x in range(9, 19):
+        p.set_pixel(x, 17, 2)
+    for x in range(11, 17):
+        p.set_pixel(x, 18, 2)
+    p.set_pixel(13, 19, 2)
+    if not display:
+        print("Smiley drawn:")
+        print(p)
+    return p
+
+
+def demo_keyboard_echo():
+    """Interactive keyboard echo demo.
+
+    Runs a CPU program that polls memory address 260 (keyboard buffer)
+    and echoes any non-zero value to VRAM. Uses the UI's Display area.
+    Handles looping gracefully without HALT.
+    """
+    source = """
+start:
+    LOAD R0 21102     # ternary 21102 = decimal 200 (VRAM start)
+    LOAD R2 1
+loop:
+    LOADM 260 R1
+    LOAD R3 0
+    CMP R1 R3
+    JZ loop
+    STOREM R0 R1
+    CLR R1
+    STOREM 260 R1
+    ADD R0 R2
+    JMP loop
+"""
+    from trinary.assembler import Assembler
+    asm = Assembler()
+    program, labels = asm.assemble(source)
+    print("Keyboard Echo Demo")
+    print(f"Labels: {labels}")
+    print(f"Program ({len(program)} instructions):")
+    for i, instr in enumerate(program):
+        print(f"  {i}: {instr}")
+    print()
+    print("Run this program in the UI, click the Display area,")
+    print("then press keys to echo characters to VRAM.")
+
+
+def demo_timer_interrupt():
+    """Timer interrupt demo: counter increments in handler, main loop runs."""
+    print("\n" + "=" * 60)
+    print("DEMO: TIMER INTERRUPT")
+    print("=" * 60)
+
+    source = """
+    SETIVT 0 handler
+    SETTIMER 10
+    LOAD R0 0
+    LOAD R1 1
+    LOAD R2 0
+    EI
+main:
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    ADD R2 R1
+    CMP R2 R1
+    JZ main
+    HALT
+handler:
+    ADD R0 R1
+    IRET
+"""
+
+    from trinary.assembler import Assembler
+    asm = Assembler()
+    program, labels = asm.assemble(source)
+
+    print(f"Program ({len(program)} instructions):")
+    for i, instr in enumerate(program):
+        print(f"  {i}: {instr}")
+
+    cpu = CPU()
+    cpu.load_program(program)
+    cpu.run(verbose=True)
+    print(f"\nResult: R0 (interrupt count) = {cpu.registers.store('R0')}")
+    print(f"Result: R2 (loop count)       = {cpu.registers.store('R2')}")
+    print(f"Total cycles: {cpu.cycles}")
+
+
 if __name__ == "__main__":
     run_all_demos()

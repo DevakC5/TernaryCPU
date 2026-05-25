@@ -1,0 +1,138 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated as
+% required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+\datalist[entry]{none/global//global/global/global}
+  \entry{shannon1937relay}{thesis}{}{}
+    \name{author}{1}{}{%
+      {{hash=SCE}{%
+         family={Shannon},
+         familyi={S\bibinitperiod},
+         given={Claude\bibnamedelima E.},
+         giveni={C\bibinitperiod\bibinitdelim E\bibinitperiod},
+      }}%
+    }
+    \strng{namehash}{SCE1}
+    \strng{fullhash}{SCE1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{title}{A Symbolic Analysis of Relay and Switching Circuits}
+    \list{institution}{1}{%
+      {Massachusetts Institute of Technology}%
+    }
+    \field{type}{mathesis}
+    \field{year}{1937}
+  \endentry
+
+  \entry{knuth2003balanced}{book}{}{}
+    \name{author}{1}{}{%
+      {{hash=KDE}{%
+         family={Knuth},
+         familyi={K\bibinitperiod},
+         given={Donald\bibnamedelima E.},
+         giveni={D\bibinitperiod\bibinitdelim E\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {Addison-Wesley}%
+    }
+    \strng{namehash}{KDE1}
+    \strng{fullhash}{KDE1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{chapter}{4.1 -- Positional Number Systems}
+    \field{edition}{3rd}
+    \field{note}{Balanced ternary is discussed in Section 4.1}
+    \field{title}{The Art of Computer Programming, Volume 2: Seminumerical
+  Algorithms}
+    \field{year}{2003}
+  \endentry
+
+  \entry{hurst1990multiple}{book}{}{}
+    \name{author}{1}{}{%
+      {{hash=HSL}{%
+         family={Hurst},
+         familyi={H\bibinitperiod},
+         given={S.\bibnamedelima L.},
+         giveni={S\bibinitperiod\bibinitdelim L\bibinitperiod},
+      }}%
+    }
+    \list{publisher}{1}{%
+      {IEEE Computer Society Press}%
+    }
+    \strng{namehash}{HSL1}
+    \strng{fullhash}{HSL1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{title}{Multiple-Valued Logic: Its Status and Its Future}
+    \list{location}{1}{%
+      {Los Alamitos, CA}%
+    }
+    \field{year}{1990}
+  \endentry
+
+  \entry{brusentsov1965setun}{article}{}{}
+    \name{author}{1}{}{%
+      {{hash=BNP}{%
+         family={Brusentsov},
+         familyi={B\bibinitperiod},
+         given={N.\bibnamedelima P.},
+         giveni={N\bibinitperiod\bibinitdelim P\bibinitperiod},
+      }}%
+    }
+    \strng{namehash}{BNP1}
+    \strng{fullhash}{BNP1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{number}{4}
+    \field{pages}{61\bibrangedash 68}
+    \field{title}{The {Setun} computer}
+    \field{journaltitle}{Vestnik Moskovskogo Universiteta, Ser. Matematika,
+  Mekhanika}
+    \field{year}{1965}
+  \endentry
+
+  \entry{lin2022ternary}{article}{}{}
+    \true{moreauthor}
+    \true{morelabelname}
+    \name{author}{2}{}{%
+      {{hash=LS}{%
+         family={Lin},
+         familyi={L\bibinitperiod},
+         given={S.},
+         giveni={S\bibinitperiod},
+      }}%
+      {{hash=ZY}{%
+         family={Zhang},
+         familyi={Z\bibinitperiod},
+         given={Y.},
+         giveni={Y\bibinitperiod},
+      }}%
+    }
+    \strng{namehash}{LSZY+1}
+    \strng{fullhash}{LSZY+1}
+    \field{labelnamesource}{author}
+    \field{labeltitlesource}{title}
+    \field{number}{3}
+    \field{pages}{1000\bibrangedash 1013}
+    \field{title}{Ternary logic circuits based on {CNTFETs}: a review}
+    \field{volume}{69}
+    \field{journaltitle}{IEEE Transactions on Circuits and Systems}
+    \field{year}{2022}
+  \endentry
+\enddatalist
+\endinput

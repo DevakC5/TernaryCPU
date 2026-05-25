@@ -164,6 +164,101 @@ level5:
     POP R1
     RET
 """,
+    "Keyboard Echo": """\
+# Poll memory[260] and echo typed characters to VRAM
+# Click the Display area to give it focus, then press keys.
+# Step or Run to advance the CPU.
+start:
+    LOAD R0 21102     # ternary 21102 = decimal 200 (VRAM start)
+    LOAD R2 1         # increment constant
+loop:
+    LOADM 260 R1      # poll keyboard buffer
+    LOAD R3 0
+    CMP R1 R3         # non-zero?
+    JZ loop           # no -> keep polling
+    STOREM R0 R1      # echo char to VRAM at R0
+    CLR R1
+    STOREM 260 R1     # clear keyboard buffer
+    ADD R0 R2         # advance pointer
+    LOAD R3 100110    # ternary 100110 = decimal 255 (VRAM end)
+    CMP R0 R3
+    JNZ loop
+    JMP start         # wrap to beginning
+""",
+    "HELLO TERNARY": """\
+# Writes 'HELLO TERNARY' to the memory-mapped display
+start:
+    LOAD R0 2200   # H
+    STOREM 200 R0
+    LOAD R0 2120   # E
+    STOREM 201 R0
+    LOAD R0 2211   # L
+    STOREM 202 R0
+    LOAD R0 2211   # L
+    STOREM 203 R0
+    LOAD R0 2221   # O
+    STOREM 204 R0
+    LOAD R0 1012   # (space)
+    STOREM 205 R0
+    LOAD R0 10010  # T
+    STOREM 206 R0
+    LOAD R0 2120   # E
+    STOREM 207 R0
+    LOAD R0 10001  # R
+    STOREM 208 R0
+    LOAD R0 2220   # N
+    STOREM 209 R0
+    LOAD R0 2102   # A
+    STOREM 210 R0
+    LOAD R0 10001  # R
+    STOREM 211 R0
+    LOAD R0 10022  # Y
+    STOREM 212 R0
+    HALT
+""",
+    "Pipeline Demo": """\
+# Pipeline visualization demo with branches
+# Shows RAW hazards and branch prediction
+start:
+    LOAD R0 10
+    LOAD R1 20
+    ADD R0 R1       # RAW hazard: R0,R1 from LOAD
+    MOV R2 R0
+    SUB R2 R1       # RAW hazard: R2 from MOV, R1 from LOAD
+    JZ done
+    LOAD R0 100
+    LOAD R1 200
+    ADD R0 R1
+done:
+    HALT
+""",
+    "Branch Prediction": """\
+# Branch prediction demo — multiple conditional jumps
+start:
+    LOAD R0 2
+    LOAD R1 0
+    LOAD R2 1
+    CLR R3
+loop:
+    ADD R3 R2       # count up
+    CMP R3 R0       # compare with limit
+    JZ exit         # predictable: taken once, not taken many times
+    JMP loop        # always taken
+exit:
+    HALT
+""",
+    "Pipeline Hazards": """\
+# RAW hazard chain — each instruction depends on the previous
+start:
+    LOAD R0 1
+    ADD R0 R0       # RAW: R0
+    ADD R0 R0       # RAW: R0
+    ADD R0 R0       # RAW: R0
+    MOV R1 R0       # RAW: R0
+    ADD R1 R1       # RAW: R1
+    ADD R1 R1       # RAW: R1
+    HALT
+""",
     "Hello Display": """\
 # Memory-mapped display demo
 # Writes text into video RAM at addresses 200-215

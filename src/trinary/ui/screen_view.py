@@ -1,51 +1,61 @@
-from PyQt6.QtWidgets import QTextEdit
-from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QColor
+from PyQt6.QtCore import Qt, pyqtSignal
 
-from trinary.display import DisplayMemoryMap, DISPLAY_START, DISPLAY_END, DISPLAY_SIZE
-
-
-COLS = 8
-ROWS = DISPLAY_SIZE // COLS
+from trinary.display import PixelDisplay, Framebuffer, PALETTE
 
 
-class ScreenView(QTextEdit):
-    """Terminal-like display widget for memory-mapped video RAM.
+PIXEL_SIZE = 12
+PALETTE_QT = {i: QColor(*rgb) for i, rgb in PALETTE.items()}
 
-    Reads display memory region (addresses 200-255) from the CPU's RAM
-    and renders characters as a fixed-grid terminal.
-    """
+
+class ScreenView(QWidget):
+    key_pressed = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        font = QFont("Courier New", 16)
-        font.setStyleHint(QFont.StyleHint.Monospace)
-        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
-        self.setFont(font)
-        self.setReadOnly(True)
-        self.setFixedHeight(180)
-        self.setStyleSheet("""
-            QTextEdit {
-                background-color: #0a0a0a;
-                color: #00ff88;
-                border: 1px solid #00ff88;
-                font-family: "Courier New", monospace;
-                font-size: 16px;
-            }
-        """)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._display = DisplayMemoryMap()
+        self._display = PixelDisplay()
+        w = PixelDisplay.WIDTH * PIXEL_SIZE
+        h = PixelDisplay.HEIGHT * PIXEL_SIZE
+        self.setFixedSize(w, h)
+        self.setStyleSheet("background-color: #0a0a0a;")
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._px_size = PIXEL_SIZE
 
-    def refresh(self, memory):
-        """Refresh the screen from CPU memory.
+    def display(self):
+        return self._display
 
-        Args:
-            memory: Memory object with .load(addr) method.
-        """
-        chars = self._display.read_display(memory)
-        lines = []
-        for r in range(ROWS):
-            row_chars = chars[r * COLS:(r + 1) * COLS]
-            lines.append("".join(row_chars))
-        self.setPlainText("\n".join(lines))
+    def clear(self):
+        self._display.clear()
+        self.update()
+
+    def set_display_source(self, source):
+        self._display = source
+        w = source.width * self._px_size
+        h = source.height * self._px_size
+        self.setFixedSize(w, h)
+        self.update()
+
+    def refresh(self, memory=None):
+        self.update()
+
+    def keyPressEvent(self, event):
+        text = event.text()
+        if text and 32 <= ord(text) <= 126:
+            self.key_pressed.emit(ord(text))
+        super().keyPressEvent(event)
+
+    def paintEvent(self, event):
+        qp = QPainter(self)
+        qp.setPen(Qt.PenStyle.NoPen)
+        buffer = self._display.get_buffer()
+        height = len(buffer)
+        width = len(buffer[0]) if height else 0
+        for y in range(height):
+            for x in range(width):
+                val = buffer[y][x]
+                if val < 0 or val > 8:
+                    val = 0
+                color = PALETTE_QT.get(val, PALETTE_QT[0])
+                qp.setBrush(color)
+                qp.drawRect(x * self._px_size, y * self._px_size, self._px_size, self._px_size)

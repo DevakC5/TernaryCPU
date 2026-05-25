@@ -21,7 +21,7 @@ class MemoryView(QTableWidget):
         self._written = set()
         self._read = set()
 
-    def populate(self, size=256):
+    def populate(self, size=512):
         self.setRowCount(size)
         for addr in range(size):
             addr_item = QTableWidgetItem(f"{addr:03d}")

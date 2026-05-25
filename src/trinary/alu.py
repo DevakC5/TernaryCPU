@@ -1,13 +1,31 @@
 """
 Ternary ALU (Arithmetic Logic Unit).
 
-Provides: ADD, SUB, AND, OR, NOT, CMP operations on ternary strings.
+Provides: ADD, SUB, MUL, DIV, AND, OR, NOT, CMP operations on ternary strings.
+
+Uses a native C acceleration layer (libternary.so) via ctypes when available.
+Set USE_NATIVE = False to force pure Python mode.
 """
+
+import warnings
 
 from trinary.arithmetic import add_ternary, subtract_ternary, multiply_ternary, divide_ternary
 from trinary.logic import tnot, tand, tor, validate_trit
 from trinary.conversion import ternary_to_decimal, decimal_to_ternary
 
+try:
+    from trinary.native_backend import (
+        NATIVE_AVAILABLE,
+        native_add,
+        native_sub,
+        native_mul,
+        native_div,
+    )
+except ImportError:
+    NATIVE_AVAILABLE = False
+
+
+USE_NATIVE = True
 
 VALID_OPERATIONS = ("ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT", "CMP")
 
@@ -79,19 +97,41 @@ def alu(operation, a, b=None):
             validate_ternary_string(b)
 
     if operation == "ADD":
-        result = add_ternary(a, b)
+        if USE_NATIVE and NATIVE_AVAILABLE:
+            dec_a = ternary_to_decimal(a)
+            dec_b = ternary_to_decimal(b)
+            result = decimal_to_ternary(native_add(dec_a, dec_b))
+        else:
+            result = add_ternary(a, b)
         return (result, None)
 
     if operation == "SUB":
-        result = subtract_ternary(a, b)
+        if USE_NATIVE and NATIVE_AVAILABLE:
+            dec_a = ternary_to_decimal(a)
+            dec_b = ternary_to_decimal(b)
+            result = decimal_to_ternary(native_sub(dec_a, dec_b))
+        else:
+            result = subtract_ternary(a, b)
         return (result, None)
 
     if operation == "MUL":
-        result = multiply_ternary(a, b)
+        if USE_NATIVE and NATIVE_AVAILABLE:
+            dec_a = ternary_to_decimal(a)
+            dec_b = ternary_to_decimal(b)
+            result = decimal_to_ternary(native_mul(dec_a, dec_b))
+        else:
+            result = multiply_ternary(a, b)
         return (result, None)
 
     if operation == "DIV":
-        result = divide_ternary(a, b)
+        if USE_NATIVE and NATIVE_AVAILABLE:
+            dec_a = ternary_to_decimal(a)
+            dec_b = ternary_to_decimal(b)
+            if dec_b == 0:
+                raise ValueError("Cannot divide by zero.")
+            result = decimal_to_ternary(native_div(dec_a, dec_b))
+        else:
+            result = divide_ternary(a, b)
         return (result, None)
 
     if operation == "NOT":

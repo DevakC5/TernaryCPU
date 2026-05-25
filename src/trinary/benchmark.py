@@ -14,6 +14,56 @@ from trinary.adder import full_adder, ripple_carry_adder
 from trinary.conversion import decimal_to_ternary, ternary_to_decimal, binary_to_decimal, decimal_to_binary
 
 
+def benchmark_throughput():
+    """Measure cycle cost and throughput for each opcode."""
+    print("=" * 70)
+    print("BENCHMARK: OPCODE THROUGHPUT")
+    print("=" * 70)
+
+    def _run(prog):
+        cpu = CPU()
+        cpu.load_program(prog)
+        cpu.run(verbose=False)
+        return cpu.cycles, len(prog)
+
+    # Format: (name, setup_instructions, test_instruction)
+    tests = [
+        ("LOAD", ["LOAD R0 1"], "LOAD R0 10"),
+        ("CLR", ["LOAD R0 1"], "CLR R0"),
+        ("NOT", ["LOAD R0 1"], "NOT R0"),
+        ("MOV", ["LOAD R0 1"], "MOV R0 R1"),
+        ("ADD", ["LOAD R0 1"], "ADD R0 R1"),
+        ("SUB", ["LOAD R0 1"], "SUB R0 R1"),
+        ("MUL", ["LOAD R0 1"], "MUL R0 R1"),
+        ("DIV", ["LOAD R0 10", "LOAD R1 2"], "DIV R0 R1"),
+        ("AND", ["LOAD R0 1"], "AND R0 R1"),
+        ("OR", ["LOAD R0 1"], "OR R0 R1"),
+        ("CMP", ["LOAD R0 1"], "CMP R0 R1"),
+        ("JMP", [], "JMP 1"),
+        ("JZ", [], "JZ 5"),
+        ("PUSH", ["LOAD R0 1"], "PUSH R0"),
+        ("POP", ["LOAD R0 1", "PUSH R0"], "POP R0"),
+        ("CALL", [], "CALL 5"),
+        ("STOREM", ["LOAD R0 1"], "STOREM 200 R0"),
+        ("LOADM", ["LOAD R0 1"], "LOADM 200 R0"),
+    ]
+    # HALT is tested at index 19 (appended)
+
+    print(f"\n{'Opcode':<20} | {'Cycles':>7} | {'IPC':>8}")
+    print("-" * 40)
+
+    for name, setup, instr in tests:
+        prog = setup + [instr, "HALT"]
+        total, n = _run(prog)
+        ipc = n / total if total else 0
+        print(f"{name:<20} | {total:>7} | {ipc:>8.3f}")
+
+    # CALL+RET pair: measure as a unit
+    total, n = _run(["LOAD R0 1", "CALL 3", "HALT", "RET"])
+    ipc = n / total if total else 0
+    print(f"{'CALL+RET':<20} | {total:>7} | {ipc:>8.3f}")
+
+
 def benchmark_instruction_counts():
     """Measure instruction counts for common operations."""
     print("=" * 70)
@@ -232,6 +282,8 @@ def benchmark_full_system():
     print(f"\n--- Result ---")
     print(f"Final R0: {cpu.registers.store('R0')}")
     print(f"Final R1: {cpu.registers.store('R1')}")
+    ipc = 4 / cpu.cycles if cpu.cycles else 0
+    print(f"Cycles: {cpu.cycles} | Instructions: 4 | IPC: {ipc:.3f}")
 
 
 def benchmark_comparison_table():
@@ -262,6 +314,7 @@ def benchmark_comparison_table():
 
 def run_all_benchmarks():
     """Run all benchmark suites."""
+    benchmark_throughput()
     benchmark_instruction_counts()
     benchmark_digit_density()
     benchmark_carry_propagation()

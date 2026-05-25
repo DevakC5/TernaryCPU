@@ -1,0 +1,633 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Page geometry ──
+\usepackage[hmargin=0.9in,vmargin=1in]{geometry}
+
+% ── Language ──
+\usepackage[english]{babel}
+
+% ── Microtypography (better justification, fewer overfull boxes) ──
+\usepackage{microtype}
+
+% ── Modern fonts via fontspec (XeLaTeX) ──
+\usepackage{fontspec}
+\setmainfont{Roboto}[
+  Path          = /home/devakchaudhari/.fonts/,
+  Extension     = .ttf,
+  UprightFont   = *-Regular,
+  BoldFont      = *-Medium,
+  ItalicFont    = *-Regular,
+  ItalicFeatures = {FakeSlant=0.167},
+]
+\setmonofont{Liberation Mono}[
+  Scale=MatchLowercase,
+]
+
+% ── Mathematics ──
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{unicode-math}
+\setmathfont{STIX Two Math}[
+  Scale=MatchLowercase,
+]
+
+% ── Graphics & floats ──
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% ── Code listings ──
+\usepackage{listings}
+\usepackage{xcolor}
+\definecolor{codegreen}{rgb}{0,0.4,0.2}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codecyan}{rgb}{0,0.5,0.5}
+\definecolor{codeyellow}{rgb}{0.55,0.5,0.1}
+\lstset{
+  basicstyle={\footnotesize\ttfamily},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{codecyan},
+  stringstyle=\color{codeyellow},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  frame=single,
+  breaklines=true,
+}
+
+% ── Hyperlinks ──
+\usepackage[hidelinks]{hyperref}
+
+% ── Bibliography ──
+\usepackage[backend=bibtex,sorting=none]{biblatex}
+\addbibresource{references.bib}
+
+% ── Custom commands ──
+\newcommand{\trinary}{\texttt{Trinary}}
+
+\title{Trinary: A Ternary (Base-3) Computer Simulation in Pure Python}
+\author{}
+\date{\today}
+
+
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+\trinary{} is a complete ternary (base-3) computer system simulated entirely in
+pure Python. The project spans the full abstraction hierarchy --- from
+fundamental logic gates (TNOT, TAND, TOR) and a ripple-carry adder, through a
+general-purpose CPU with 26 instructions, memory-mapped I/O, interrupts, and a
+hardware timer, up to a minimal operating system shell and a PyQt6 desktop
+visual simulator. This document describes the architecture, instruction set,
+memory model, interrupt system, and implementation decisions behind the
+simulator, and serves as a reference for further research into non-binary
+computing models.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+% ===================================================================
+\section{Introduction to Ternary Computing}
+\label{sec:introduction}
+% ===================================================================
+
+\subsection{Binary vs.\ Ternary Number Systems}
+
+Modern computing is overwhelmingly binary.  Since the earliest electronic
+computers --- ENIAC (1945), EDVAC, and the von Neumann architecture --- the
+two-state switch (on/off, true/false, 1/0) has dominated digital logic.
+Claude Shannon's 1937 master's thesis~\cite{shannon1937relay} established
+that Boolean algebra could be realized with electrical switching circuits,
+cementing binary as the natural choice for hardware.
+
+Yet binary is not the only possibility.  A ternary (base-3) digit --- called
+a \emph{trit} --- can represent three distinct states, typically denoted
+0, 1, and 2.  This extra state per digit has profound implications for
+information density, circuit complexity, and arithmetic efficiency.
+
+\begin{table}[H]
+  \centering
+  \caption{Comparing the number of digits needed to represent values in
+           binary vs.\ ternary.}
+  \label{tab:digit-comparison}
+  \begin{tabular}{c|c|c|c}
+    \textbf{Value} & \textbf{Binary digits} & \textbf{Ternary digits}
+    & \textbf{Savings} \\ \hline
+    10    & 4  & 3  & 25\% \\
+    100   & 7  & 5  & 29\% \\
+    1000  & 10 & 7  & 30\% \\
+    10$^6$ & 20 & 13 & 35\% \\
+    10$^8$ & 27 & 17 & 37\%
+  \end{tabular}
+\end{table}
+
+\subsection{Information-Theoretic Advantages}
+
+Donald Knuth, in \emph{The Art of Computer Programming}, notes that the
+base $r$ that maximizes information density is $e$, with 3 being the
+closest integer~\cite{knuth2003balanced}.  The \emph{radix economy}
+$E(r, N) = r \cdot \lceil \log_r N \rceil$ measures the cost of
+representing a number $N$ in base $r$.  Base 3 minimizes this cost among
+integer bases:
+
+\begin{itemize}
+  \item Binary $(r=2)$: $2 \cdot \log_2 N$
+  \item Ternary $(r=3)$: $3 \cdot \log_3 N \approx 3 \cdot \frac{\ln N}{\ln 3}
+        \approx 2.73 \cdot \ln N$
+  \item Quaternary $(r=4)$: $4 \cdot \log_4 N \approx 4 \cdot
+        \frac{\ln N}{\ln 4} \approx 2.89 \cdot \ln N$
+\end{itemize}
+
+Ternary achieves the lowest constant factor ($\approx 2.73$) among integer
+bases, meaning it can represent a given range of values with the fewest
+physical components in an idealized circuit model.  Hurst further explores
+these tradeoffs in the context of multiple-valued logic
+systems~\cite{hurst1990multiple}.
+
+\subsection{The Soviet Setun Computer (1958)}
+
+The most famous practical implementation of ternary computing is the
+\texttt{Setun} computer, developed at Moscow State University by
+Nikolai~P.~Brusentsov and his team in 1958~\cite{brusentsov1965setun}.
+
+The Setun used \emph{balanced ternary} (trits valued $-1, 0, +1$), which
+offered a natural representation of negative numbers without a dedicated
+sign bit.  Key specifications included:
+
+\begin{itemize}
+  \item 36-bit (trit) word length --- approximately 18 decimal digits of
+        precision
+  \item Ferrite-diode memory cells for the register file
+  \item Magnetic drum memory for bulk storage
+  \item Approximately 50 machines were produced and deployed in Soviet
+        universities and research laboratories
+\end{itemize}
+
+The Setun demonstrated that ternary computing was not merely a theoretical
+curiosity but a viable engineering alternative.  Its production ended in
+the mid-1960s as binary hardware --- simpler to design with
+transistor-transistor logic (TTL) --- became dominant.
+
+\subsection{Why Simulate a Ternary Computer in Software?}
+
+Building a physical ternary computer today would require custom logic
+families (e.g., CNTFET-based ternary gates~\cite{lin2022ternary}) and
+fabrication processes that remain niche.  However, a software simulation
+offers several advantages:
+
+\begin{enumerate}
+  \item \textbf{Pedagogy}: A simulated machine can be inspected at every
+        level --- from individual trits and logic gates up to running
+        programs and an operating system --- making it an ideal teaching
+        tool for computer architecture.
+  \item \textbf{Experimentation}: Instruction sets, memory models,
+        addressing modes, and interrupt systems can be prototyped,
+        modified, and benchmarked without hardware constraints.
+  \item \textbf{Reproducibility}: A pure-Python simulator runs on any
+        platform with a Python interpreter (3.10+), ensuring that results
+        are fully deterministic and shareable.
+  \item \textbf{Accessibility}: No specialized hardware or FPGA toolchains
+        required --- a single \texttt{pip install} is sufficient to boot
+        the simulated machine and interact with its OS shell.
+\end{enumerate}
+
+\subsection{Scope of This Book}
+
+This book traces the complete stack of the \trinary{} ternary computer
+simulation, progressing through 25 chapters from first principles to a
+working graphical debugger:
+
+\begin{enumerate}
+  \item[(Ch.\ 2)] System architecture and module dependency graph
+  \item[(Ch.\ 3)] Environment setup and ``Hello, Ternary''
+  \item[(Ch.\ 4--5)] The Trit datatype and base-conversion systems
+  \item[(Ch.\ 6--7)] Ternary logic gates and adder circuits
+  \item[(Ch.\ 8--9)] Arithmetic via decimal round-trip and the ALU
+  \item[(Ch.\ 10--11)] Register file and memory architecture
+  \item[(Ch.\ 12--20)] CPU design, all 26 instructions, interrupts, and timer
+  \item[(Ch.\ 21--22)] Two-pass assembler and machine-code encoding
+  \item[(Ch.\ 23)] Memory-mapped display and keyboard subsystem
+  \item[(Ch.\ 24)] The operating system shell
+  \item[(Ch.\ 25)] The PyQt6 visual simulator
+\end{enumerate}
+
+Each chapter includes runnable code examples that readers can execute
+immediately against the \trinary{} package.
+
+\subsection{Verifying Your Environment}
+
+Before proceeding, verify that your Python environment is ready:
+
+\begin{lstlisting}[language=bash, caption={Installing \trinary{} and running
+the test suite.}]
+pip install -e .
+python -m pytest tests/ -v
+\end{lstlisting}
+
+The test suite (113 tests, all passing) exercises every component from
+base conversion to interrupt handling.  A successful run produces output
+similar to:
+
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+======================== 113 passed in 0.06s =========================
+\end{lstlisting}
+
+You can also launch the interactive OS shell immediately:
+
+\begin{lstlisting}[language=bash]
+python -m trinary.os
+\end{lstlisting}
+
+If the shell boots and displays a \texttt{Trishell!>} prompt, your
+environment is fully functional and you are ready to begin.
+
+% ===================================================================
+\section{Data Representation}
+\label{sec:data}
+% ===================================================================
+
+All numeric values are represented as signed-magnitude ternary strings.  A
+leading minus sign (\texttt{-}) denotes a negative number; its absence denotes
+a non-negative number.  The \texttt{Trit} class encapsulates a single ternary
+digit with possible values 0, 1, 2.
+
+\begin{table}[H]
+  \centering
+  \caption{Ternary-decimal correspondence.}
+  \label{tab:ternary-decimal}
+  \begin{tabular}{c|c}
+    \textbf{Ternary} & \textbf{Decimal} \\ \hline
+    0      & 0  \\
+    1      & 1  \\
+    2      & 2  \\
+    10     & 3  \\
+    11     & 4  \\
+    12     & 5  \\
+    20     & 6  \\
+    21     & 7  \\
+    22     & 8  \\
+    100    & 9  \\
+    -10    & $-3$ \\
+    -101   & $-10$
+  \end{tabular}
+\end{table}
+
+Conversion functions provide bidirectional translation between ternary strings,
+decimal integers, and binary integers, enabling seamless interaction with
+Python's native numeric operations.
+
+% ===================================================================
+\section{Logic Gates}
+\label{sec:gates}
+% ===================================================================
+
+Ternary logic extends Boolean logic by introducing a third truth value.  Three
+primitive gates are defined:
+
+\begin{align*}
+  \text{TNOT}(x) &= 2 - x \\
+  \text{TAND}(x, y) &= \min(x, y) \\
+  \text{TOR}(x, y) &= \max(x, y)
+\end{align*}
+
+where $x, y \in \{0, 1, 2\}$.  Truth tables for each gate are available
+through the \texttt{trinary.logic} module.
+
+% ===================================================================
+\section{Addition Paths}
+\label{sec:addition}
+% ===================================================================
+
+The project provides two parallel addition implementations:
+
+\paragraph{Native adder (\texttt{adder.py})}
+A half-adder, full-adder, and ripple-carry adder operating directly on ternary
+digits (values 0, 1, 2).  The ripple-carry adder chains full-adders for each
+trit position and does not handle negative numbers.
+
+\paragraph{Decimal round-trip (\texttt{arithmetic.py})}
+The ADD, SUB, MUL, and DIV functions convert ternary operands to decimal,
+perform the operation in Python integers, and convert the result back to
+ternary.  This path naturally handles signed-magnitude negatives.
+
+The ALU (\texttt{alu.py}) selects the latter path for all arithmetic
+operations.
+
+% ===================================================================
+\section{CPU Architecture}
+\label{sec:cpu}
+% ===================================================================
+
+\subsection{Registers}
+
+The CPU provides four general-purpose registers and three special-purpose
+registers:
+
+\begin{table}[H]
+  \centering
+  \caption{Register file.}
+  \label{tab:registers}
+  \begin{tabular}{c|l}
+    \textbf{Name} & \textbf{Purpose} \\ \hline
+    R0   & Primary accumulator \\
+    R1   & Secondary register \\
+    R2   & General purpose \\
+    R3   & General purpose (OS convention: always 0) \\
+    PC   & Program counter \\
+    SP   & Stack pointer (starts at 255, grows downward) \\
+    Flags & Condition flags: ZERO, EQUAL, GREATER, LESS
+  \end{tabular}
+\end{table}
+
+\subsection{Memory Map}
+
+The address space is 512 trits wide.  Memory is divided into regions:
+
+\begin{table}[H]
+  \centering
+  \caption{Memory map.}
+  \label{tab:memory}
+  \begin{tabular}{c|l}
+    \textbf{Addresses} & \textbf{Purpose} \\ \hline
+    0--127   & General data / program \\
+    128--199 & Stack \\
+    200--255 & Video RAM (56 characters, $7 \times 8$ grid) \\
+    260      & Keyboard buffer \\
+    256--511 & Reserved / future expansion
+  \end{tabular}
+\end{table}
+
+\subsection{Fetch-Decode-Execute Cycle}
+
+\subsubsection{Fetch}
+The instruction at \texttt{program[PC]} is read as a raw string.
+
+\subsubsection{Decode}
+The instruction string is split into tokens.  The first token is the opcode;
+subsequent tokens are operands (register names, numeric literals, or labels).
+
+\subsubsection{Execute}
+The CPU dispatches to the appropriate handler for the decoded opcode.  Side
+effects include register changes, memory writes, stack operations, and PC
+modification.
+
+\subsubsection{Update}
+Unless the instruction modified \texttt{PC} (e.g., JMP, JZ, CALL), \texttt{PC}
+is incremented by one.
+
+\subsection{Dual Stacks}
+
+The CPU maintains two distinct stacks:
+
+\begin{description}
+  \item[Memory stack] (SP, addresses 128--199) --- used by PUSH and POP.
+        Grows downward from address 255.
+  \item[Call stack] (Python list) --- used by CALL and RET for subroutine
+        return addresses.  Not visible in the memory address space.
+\end{description}
+
+This design separates data stacking from control-flow stacking, simplifying
+implementation and avoiding address-space conflicts.
+
+\subsection{Flags}
+
+The CMP instruction compares two ternary values and sets four boolean flags:
+\begin{itemize}
+  \item \texttt{ZERO}: result is zero.
+  \item \texttt{EQUAL}: operands are equal.
+  \item \texttt{LESS}: first operand $<$ second.
+  \item \texttt{GREATER}: first operand $>$ second.
+\end{itemize}
+Jump instructions (JZ, JNZ) and conditional logic use these flags.
+
+\subsection{Interrupts}
+
+The interrupt system provides:
+
+\begin{itemize}
+  \item \textbf{Interrupt vector table (IVT)}: 8 entries, each storing a
+        handler address.  Set via SETIVT.
+  \item \textbf{Software interrupts}: triggered by the INT instruction with an
+        interrupt number argument.
+  \item \textbf{Hardware timer}: periodic interrupt (interrupt 0) configured
+        via SETTIMER.  Can be enabled/disabled with EI/DI.
+  \item \textbf{Interrupt return}: IRET pops the saved PC and re-enables
+        interrupts.
+\end{itemize}
+
+% ===================================================================
+\section{Instruction Set}
+\label{sec:isa}
+% ===================================================================
+
+The CPU implements 26 instructions, grouped into functional categories:
+
+\subsection{Data Movement}
+LOAD, MOV, CLR
+
+\subsection{Arithmetic}
+ADD, SUB, MUL, DIV
+
+\subsection{Logical}
+AND, OR, NOT
+
+\subsection{Comparison}
+CMP
+
+\subsection{Control Flow}
+JMP, JZ, JNZ
+
+\subsection{Subroutines}
+CALL, RET
+
+\subsection{Stack}
+PUSH, POP
+
+\subsection{Memory}
+STOREM, LOADM
+
+\subsection{Interrupts}
+INT, IRET, EI, DI, SETIVT
+
+\subsection{Timer}
+SETTIMER
+
+\subsection{System}
+HALT
+
+See \texttt{docs/instruction-set.md} for the complete opcode reference.
+
+% ===================================================================
+\section{Assembler}
+\label{sec:assembler}
+% ===================================================================
+
+The assembler (\texttt{assembler.py}) is a two-pass assembler:
+
+\begin{enumerate}
+  \item \textbf{Pass 1}: Scan all source lines for label definitions
+        (e.g., \texttt{start:}).  Record the address (line number) of each
+        label in a symbol table.
+  \item \textbf{Pass 2}: Re-scan all source lines, resolve label references
+        in jump/call operands using the symbol table, and emit a list of
+        instruction strings.
+\end{enumerate}
+
+Inline comments are supported with both \texttt{\#} and \texttt{;} delimiters,
+handled by \texttt{assembler.parse\_line}.
+
+% ===================================================================
+\section{Machine Code}
+\label{sec:machine-code}
+% ===================================================================
+
+The \texttt{machine.py} module provides a machine-code encoder and decoder that
+converts between assembly strings and variable-length ternary opcode strings.
+Currently, 21 of the 26 instructions have machine-code mappings.  The
+instructions INT, IRET, EI, DI, SETIVT, and SETTIMER do not yet have opcode
+assignments in the encoding table.
+
+% ===================================================================
+\section{OS Shell}
+\label{sec:os}
+% ===================================================================
+
+The minimal operating system (\texttt{os.py}) is written entirely in assembly
+(~342 lines).  It provides an interactive command shell with the following
+commands:
+
+\begin{table}[H]
+  \centering
+  \caption{OS shell commands.}
+  \label{tab:os-commands}
+  \begin{tabular}{l|l}
+    \textbf{Command} & \textbf{Description} \\ \hline
+    HELP     & Lists available commands \\
+    CLS      & Clears the display \\
+    REGS     & Shows register values \\
+    MEMDUMP  & Dumps first 8 memory addresses \\
+    RUN      & Placeholder: prints ``RUN!''
+  \end{tabular}
+\end{table}
+
+The OS implements memory-mapped keyboard polling, an input line buffer with
+backspace support, cursor management with display scrolling, and
+multi-character command parsing.
+
+% ===================================================================
+\section{Display System}
+\label{sec:display}
+% ===================================================================
+
+The display system maps memory addresses 200--255 to a 7-row by 8-column
+character display (56 characters total).  A \texttt{PixelDisplay} class
+provides a 27$\times$27 pixel framebuffer representation.  Address 260 serves
+as a keyboard buffer: the OS polls this address, and the UI (or a human user)
+writes ASCII key codes into it.
+
+% ===================================================================
+\section{PyQt6 Desktop UI}
+\label{sec:ui}
+% ===================================================================
+
+The \texttt{trinary.ui} package provides a PyQt6-based graphical simulator
+with the following panels:
+
+\begin{itemize}
+  \item \textbf{Assembler editor}: syntax highlighting (opcodes=cyan,
+        registers=yellow, labels=purple, comments=green, numbers=white),
+        clickable breakpoints in the gutter.
+  \item \textbf{Machine code viewer}: ternary opcode strings displayed
+        alongside assembly source.
+  \item \textbf{Register panel}: R0--R3 values with flash animation on change;
+        PC, SP, and four flag indicators.
+  \item \textbf{Memory viewer}: 512-row table with colour-coded access tracking
+        (green=write, blue=read, current PC highlight).
+  \item \textbf{Stack viewer}: live stack contents with SP position marker.
+  \item \textbf{Execution trace}: step-by-step history (step number, PC,
+        instruction, registers, flags).
+  \item \textbf{Pixel display}: 27$\times$27 pixel framebuffer with keyboard
+        capture.
+  \item \textbf{Toolbar}: demo selector (13 programs) and execution controls
+        (Assemble, Run, Step Into, Step Over, Reset, Pause, Continue).
+\end{itemize}
+
+The UI is fully decoupled from the back-end --- it interacts exclusively
+through the public CPU and memory APIs.  The stylesheet
+(\texttt{styles.py}) provides a dark cyberpunk theme.
+
+% ===================================================================
+\section{Testing}
+\label{sec:tests}
+% ===================================================================
+
+The project includes 113 tests across 8 test files:
+
+\begin{table}[H]
+  \centering
+  \caption{Test suite.}
+  \label{tab:tests}
+  \begin{tabular}{l|l}
+    \textbf{File} & \textbf{Coverage} \\ \hline
+    test\_conversion.py  & Trit class, base conversion \\
+    test\_arithmetic.py  & ADD, SUB, MUL, DIV \\
+    test\_alu.py         & All 8 ALU operations \\
+    test\_assembler.py   & Label resolution, comments \\
+    test\_cpu.py         & All 26 opcodes, flags, stack, interrupts \\
+    test\_cpu\_stress.py & Nested calls, long loops \\
+    test\_display.py     & Memory-mapped display, keyboard
+  \end{tabular}
+\end{table}
+
+Tests can be run with:
+\begin{lstlisting}[language=bash]
+python -m pytest tests/ -v
+\end{lstlisting}
+
+% ===================================================================
+\section{Related Work}
+\label{sec:related}
+% ===================================================================
+
+The most famous ternary computer is the Soviet \texttt{Setun}
+(1958)~\cite{brusentsov1965setun}, which used balanced ternary
+($-1, 0, +1$) and was built from ferrite-diode cells.  More recently,
+ternary logic has been explored in the context of
+\textsc{cntfet}-based circuits~\cite{lin2022ternary} and
+memristive ternary systems.
+
+Software simulators of non-binary architectures include the
+\texttt{ternary-computer} project and various
+university-level teaching simulators.  \trinary{} distinguishes itself by
+combining a complete, documented ISA with an interactive OS shell and a
+modern desktop UI, all implemented in a single, well-tested Python
+package.
+
+% ===================================================================
+\section{Future Directions}
+\label{sec:future}
+% ===================================================================
+
+Possible extensions and improvements:
+
+\begin{itemize}
+  \item Complete machine-code mappings for the remaining six instructions
+        (INT, IRET, EI, DI, SETIVT, SETTIMER).
+  \item A balanced ternary mode ($-1, 0, +1$) as an alternative to
+        signed-magnitude representation.
+  \item An expanded memory model supporting paging or banking.
+  \item A network interface or I/O port system.
+  \item A compiler from a high-level language (e.g., a subset of C) to
+        ternary assembly.
+  \item WebAssembly compilation via Pyodide for in-browser simulation.
+\end{itemize}
+
+% ===================================================================
+\printbibliography
+% ===================================================================
+
+\end{document}

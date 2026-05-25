@@ -57,6 +57,12 @@ OPCODE_MAP = {
     "DIV": "200",
     "STOREM": "201",
     "LOADM": "202",
+    "TVECADD": "210",
+    "TMATMUL": "211",
+    "TDOT": "212",
+    "TACT": "220",
+    "TLOADW": "221",
+    "TSTOREW": "222",
 }
 
 OPCODE_REVERSE = {v: k for k, v in OPCODE_MAP.items()}
@@ -121,6 +127,26 @@ def encode_instruction(instr, labels=None):
         raise ValueError(f"Unknown opcode: {opcode}")
 
     if opcode in ("RET", "HALT", "NOT"):
+        return op_code
+
+    if opcode in ("TVECADD", "TMATMUL", "TDOT"):
+        if len(operands) >= 3:
+            return op_code + operands[0] + operands[1] + operands[2]
+        return op_code
+
+    if opcode == "TACT":
+        if len(operands) >= 2:
+            return op_code + operands[0] + operands[1]
+        return op_code
+
+    if opcode == "TLOADW":
+        if len(operands) >= 3:
+            return op_code + operands[0] + operands[1] + operands[2]
+        return op_code
+
+    if opcode == "TSTOREW":
+        if len(operands) >= 2:
+            return op_code + operands[0] + operands[1]
         return op_code
 
     if opcode in ("STOREM", "LOADM"):
@@ -202,6 +228,36 @@ def decode_instruction(machine_code):
     if opcode in ("PUSH", "POP"):
         src = decode_register(rest[0]) if rest else "?"
         return f"{opcode} {src}"
+
+    if opcode == "TVECADD":
+        if rest and len(rest) >= 3:
+            return f"{opcode} {rest[0]} {rest[1]} {rest[2]}"
+        return f"{opcode} ?"
+
+    if opcode == "TMATMUL":
+        if rest and len(rest) >= 3:
+            return f"{opcode} {rest[0]} {rest[1]} {rest[2]}"
+        return f"{opcode} ?"
+
+    if opcode == "TDOT":
+        if rest and len(rest) >= 2:
+            return f"{opcode} {rest[0]} {rest[1]}"
+        return f"{opcode} ?"
+
+    if opcode == "TACT":
+        if rest and len(rest) >= 2:
+            return f"{opcode} {rest[0]} {rest[1]}"
+        return f"{opcode} ?"
+
+    if opcode == "TLOADW":
+        if rest and len(rest) >= 3:
+            return f"{opcode} {rest[0]} {rest[1]} {rest[2]}"
+        return f"{opcode} ?"
+
+    if opcode == "TSTOREW":
+        if rest and len(rest) >= 2:
+            return f"{opcode} {rest[0]} {rest[1]}"
+        return f"{opcode} ?"
 
     if opcode == "STOREM":
         if rest:

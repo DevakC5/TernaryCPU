@@ -18,6 +18,7 @@ class Memory:
         """
         self.size = size
         self.data = {i: "0" for i in range(size)}
+        self._write_hooks = []
 
     def validate_address(self, address):
         """Validate memory address."""
@@ -37,6 +38,17 @@ class Memory:
                 raise ValueError(f"Invalid trit: {c}. Must be 0, 1, or 2")
         return True
 
+    def register_write_hook(self, start, end, callback):
+        """Register a callback for writes in an address range.
+
+        Args:
+            start (int): Start address (inclusive)
+            end (int): End address (inclusive)
+            callback (callable): Called as callback(address, value) on every
+                                 store() in the range.
+        """
+        self._write_hooks.append((start, end, callback))
+
     def store(self, address, value):
         """STOREM - Store value at address.
 
@@ -53,6 +65,9 @@ class Memory:
         self.validate_address(address)
         self.validate_value(value)
         self.data[address] = value
+        for hstart, hend, hook in self._write_hooks:
+            if hstart <= address <= hend:
+                hook(address, value)
         return value
 
     def load(self, address):
