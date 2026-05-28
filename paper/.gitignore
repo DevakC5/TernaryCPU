@@ -1,0 +1,16 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.ind
+*.idx
+*.ilg
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.syntex.gz
+texput.*
+main.pdf
+main_compact.pdf
