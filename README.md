@@ -81,7 +81,7 @@ src/trinary/             ← installable package
 │   └── ...
 ├── accelerator/         Tensor Accelerator Coprocessor
 │   ├── accelerator.py   Core tensor ops (add/mul/dot/act)
-│   ├── gpu.py           GPU mode (PEs, workgroups, dispatch)
+│   ├── gpu.py           GPU mode (PEs, warps, workgroups, streams, native C)
 │   ├── simd.py          SIMD processor
 │   ├── packed_trits.py  Packed trit storage
 │   ├── vector_ops.py    Vector operations
@@ -129,7 +129,7 @@ tests/                  ← 594 pytest tests
 ├── test_cpu.py              All 27 opcodes + flags + stack + interrupts
 ├── test_cpu_accelerator.py  CPU + accelerator integration
 ├── test_accelerator.py      Tensor coprocessor unit tests
-├── test_gpu.py              GPU mode
+├── test_gpu.py              GPU mode (71 tests: warps, streams, native C, visualization)
 ├── test_pipeline.py         Clock, pipeline, hazards, realistic timing
 ├── test_cache.py            Cache hit/miss
 ├── test_branch_predictor.py Prediction accuracy

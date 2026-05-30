@@ -3130,59 +3130,88 @@ tests.
 \chapter{GPU Mode and Parallel Computing}
 \label{ch:gpu}
 
-The simulated GPU (\code{gpu.py}) extends the accelerator model with a parallel
-processing hierarchy.
+The simulated GPU (\code{gpu.py}) extends the accelerator model with a four-level
+parallel processing hierarchy, native C acceleration, and multi-stream execution.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{gpu_hierarchy.pdf}
-\caption{GPU processing hierarchy --- individual Processing Elements grouped into Workgroups, coordinated by the Ternary GPU controller}
+\caption{GPU processing hierarchy --- Processing Elements grouped into Warps, Warps into Workgroups, coordinated by the Ternary GPU controller with stream-based scheduling}
 \label{fig:gpuhier}
 \end{figure}
 
 \section{Hierarchy}
 
 \begin{description}
-    \item[\textbf{Processing Element (PE)}]: The smallest compute unit, executing a
-          single kernel thread with local register state. Each PE receives its global
-          and local ID.
-    \item[\textbf{Workgroup}]: A group of PEs sharing local memory and synchronization
-          barriers. Workgroups enable cooperative computation on shared data.
+    \item[\textbf{Processing Element (PE)}]: The smallest compute unit, with local
+          packed memory, a result register, and an \code{active} flag. Each PE executes
+          element-wise ternary operations (add, mul, dot, threshold, sum, max, min).
+    \item[\textbf{Warp}]: A SIMT execution group. All PEs in a warp execute the same
+          instruction in lockstep on different data, analogous to NVIDIA warps or AMD wavefronts.
+    \item[\textbf{Workgroup (Thread Block)}]: A group of warps sharing local memory
+          with barrier synchronization. Workgroups enable cooperative computation on
+          shared data across PEs.
     \item[\textbf{TernaryGPU}]: The complete hierarchy with configurable
-          $\text{PEs\_per\_wg} \times n\_\text{workgroups}$ processing elements.
+          $\text{num\_workgroups} \times \text{pes\_per\_wg}$ processing elements
+          (default: $4 \times 16 = 64$ cores, 16 warps).
 \end{description}
 
 \section{Kernel Dispatch}
 
-Kernels are Python callables distributed across all PEs. The dispatch mechanism:
+The GPU supports multiple dispatch models:
+\begin{description}
+    \item[\code{dispatch\_kernel}]: Distributes data slices across workgroups, each
+          workgroup processes its slice via warps.
+    \item[\code{dispatch\_grid}]: 2D thread block grid model for spatial decomposition.
+    \item[\code{batch\_dispatch}]: One PE per batch element simultaneously.
+\end{description}
+
+\section{Streams and Concurrency}
+
+Multi-stream execution enables overlapping computation:
 \begin{enumerate}
-    \item Creates the PE grid based on configuration;
-    \item Assigns each PE its global and local indices;
-    \item Executes the kernel on each PE (or each workgroup for cooperative kernels);
-    \item Synchronizes workgroups at barrier points;
-    \item Collects results.
+    \item \code{create\_stream} allocates a stream with an internal work queue;
+    \item \code{dispatch\_stream} executes the next kernel from a stream;
+    \item \code{run\_streams\_concurrent} schedules all streams round-robin.
 \end{enumerate}
 
-\section{Parallel Matrix Multiplication}
+\section{Parallel Operations}
 
-Matrix multiplication is decomposed into workgroups, each computing a tile of the
-result matrix. PEs within a workgroup collaborate on tile computation with barrier
-synchronization. This demonstrates the classic tiled matmul algorithm adapted for
-ternary arithmetic.
+\begin{description}
+    \item[\textbf{Matrix Multiplication}]: Uses all PEs per workgroup---each PE
+          computes different columns of the result in parallel.
+    \item[\textbf{Reduction}]: Parallel \code{reduce()} splits data across workgroups,
+          each reduces its chunk, then combines partials (sum/max/min).
+    \item[\textbf{Prefix Scan}]: Inclusive scan via workgroup-level chunks with
+          inter-workgroup prefix propagation.
+    \item[\textbf{Fused Linear}]: \code{fused\_linear()} computes
+          $\text{activation}(W \cdot x + b)$ in a single GPU pass.
+\end{description}
 
-The GPU mode is validated by 19 tests including kernel dispatch, tensor pipeline
-execution, and visualization rendering.
+\section{Native C Acceleration}
 
-\section{Visualization}
+The GPU hot loops are implemented in C (\code{gpu\_kernels.c}, 200 lines) and accessed
+via ctypes (\code{gpu\_native.py}). The \code{USE\_GPU\_GPU\_NATIVE} flag auto-selects
+C paths when available, falling back to pure Python.
 
-ASCII rendering tools in \code{viz.py}:
-\begin{verbatim}
-render_simd_lanes(trit_values)    → SIMD lane activity bar
-render_tensor_matrix(data)        → 2D tensor content
-render_matmul(A, B, result)       → Matrix multiplication stages
-render_gpu_state(gpu)             → Full GPU state overview
-render_packed_trits(data)         → Packed storage layout
-\end{verbatim}
+\begin{table}[H]
+\centering
+\caption{GPU native C speedups over pure Python}
+\label{tab:gpuspeedup}
+\begin{tabular}{lrr}
+\toprule
+Operation & Speedup \\
+\midrule
+Matmul 8$\times$8 & 27.3$\times$ \\
+Reduce 1024 elements & 6.5$\times$ \\
+Fused linear 8$\times$16 & 4.4$\times$ \\
+Prefix scan 1024 & 2.6$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The GPU is validated by 71 tests covering kernel dispatch, warp execution, streams,
+parallel matmul, reduction, scan, transpose, fused operations, and native C correctness.
 
 %====================================================================
 \chapter{SIMD and Packed Storage}
@@ -5686,7 +5715,7 @@ Test File & Focus & Tests \\
 \code{test\_display.py} & Text display, keyboard, STOREM/LOADM & 20 \\
 \code{test\_display\_framebuffer.py} & Framebuffer display & 20 \\
 \code{test\_dma.py} & DMA transfers, concurrency & 7 \\
-\code{test\_gpu.py} & GPU mode, kernel dispatch, visualization & 19 \\
+\code{test\_gpu.py} & GPU mode, warps, streams, native C, visualization & 71 \\
 \code{test\_interrupts.py} & Interrupt controller (8-line) & 8 \\
 \code{test\_losses.py} & Neural network loss functions & 10 \\
 \code{test\_native\_backend.py} & Native C bridge (ctypes) & 11 \\

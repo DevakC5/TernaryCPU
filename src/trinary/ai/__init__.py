@@ -13,6 +13,7 @@ from trinary.ai.trainer import TernaryTrainer
 from trinary.ai.optimizers import SGDOptimizer, TernaryHillClimber
 from trinary.ai.losses import ternary_mse, ternary_absolute_error, classification_error
 from trinary.ai.datasets import get_dataset, list_datasets
+from trinary.ai.mnist import load_mnist, mnist_datasets, print_sample
 
 __all__ = [
     "trit_to_signed",
@@ -34,4 +35,7 @@ __all__ = [
     "print_tensor",
     "print_weights",
     "print_network_summary",
+    "load_mnist",
+    "mnist_datasets",
+    "print_sample",
 ]

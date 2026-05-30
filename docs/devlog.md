@@ -534,8 +534,22 @@ Released v2.0.0 — a major expansion from 113 to 594 tests, adding entire subsy
 - Game window for SDK games
 - 15+ demo programs
 
+## GPU Expansion (v2.1.0)
+- Expanded GPU from 8 cores (2 WG × 4 PEs) to 64 cores (4 WG × 16 PEs)
+- Added Warp class for SIMT lockstep execution (16 warps total)
+- Added shared memory and barrier synchronization per workgroup
+- Added multi-stream concurrent execution
+- Added 2D thread block grid dispatch
+- Added parallel reduction (sum/max/min), prefix scan, transpose
+- Added fused operations (fused_linear, elementwise_fused)
+- Added batch dispatch for bulk processing
+- Native C GPU kernels (gpu_kernels.c): matmul 27x, reduce 6.5x, fused linear 4.4x speedup
+- GPU visualization: render_gpu, render_warp, render_streams
+- 71 GPU tests (up from 19)
+- Updated ARCHITECTURE.md, paper, diagrams
+
 ## Stats
 - 27 opcodes (up from 21)
-- 594 tests (up from 113)
-- ~28,000 lines of code
+- 646 tests (up from 113)
+- ~30,000 lines of code
 - All tests passing

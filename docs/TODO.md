@@ -152,7 +152,7 @@ All v2.0.0 features are complete. See [benchmarks.md](benchmarks.md), [ui-guide.
 - [x] CPU + accelerator integration tests
 - [x] Display tests (text + framebuffer)
 - [x] Accelerator unit tests (70)
-- [x] GPU mode tests
+- [x] GPU mode tests (71: warps, streams, native C, visualization)
 - [x] Pipeline/clock/hazard tests
 - [x] Cache tests
 - [x] Branch predictor tests

@@ -114,46 +114,59 @@ def system_stack_diagram():
     print("Generated system_stack.pdf")
 
 def gpu_hierarchy_diagram():
-    """GPU hierarchy: PE → Workgroup → GPU."""
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 5)
+    """GPU hierarchy: PE → Warp → Workgroup → GPU."""
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 6.5)
     ax.axis('off')
 
     # GPU box
-    gpu_rect = mpatches.FancyBboxPatch((0.3, 0.3), 9.4, 4.4,
+    gpu_rect = mpatches.FancyBboxPatch((0.3, 0.3), 11.4, 5.8,
                                          boxstyle="round,pad=0.2",
                                          facecolor='#1a1a3e', edgecolor='#8888ff',
                                          linewidth=3, alpha=0.9)
     ax.add_patch(gpu_rect)
-    ax.text(5, 4.6, 'TernaryGPU', ha='center', va='top', fontsize=12,
-            fontweight='bold', color='#8888ff')
+    ax.text(6, 5.9, 'TernaryGPU (64 cores, 16 warps)', ha='center', va='top',
+            fontsize=11, fontweight='bold', color='#8888ff')
 
     # Workgroups
-    for wg_idx, (wx, ww) in enumerate([(0.8, 4.0), (5.2, 4.0)]):
-        wg_rect = mpatches.FancyBboxPatch((wx, 0.8), ww, 3.2,
+    wg_positions = [(0.6, 5.2), (5.8, 5.2)]
+    for wg_idx, (wx, ww) in enumerate(wg_positions):
+        wg_rect = mpatches.FancyBboxPatch((wx, 0.6), ww, 4.8,
                                             boxstyle="round,pad=0.1",
                                             facecolor='#2a2a5e', edgecolor='#aa66ff',
                                             linewidth=2)
         ax.add_patch(wg_rect)
-        ax.text(wx + ww/2, 3.7, f'Workgroup {wg_idx}', ha='center', va='center',
-                fontsize=9, fontweight='bold', color='#aa66ff')
+        ax.text(wx + ww/2, 5.1, f'Workgroup {wg_idx} (16 PEs)',
+                ha='center', va='center', fontsize=8, fontweight='bold', color='#aa66ff')
 
-        # PEs within workgroup
-        for pe_idx in range(6):
-            px = wx + 0.2 + (pe_idx % 3) * 1.2
-            py = 1.0 + (pe_idx // 3) * 1.3
-            pe_rect = mpatches.FancyBboxPatch((px, py), 1.0, 1.0,
-                                                boxstyle="round,pad=0.05",
-                                                facecolor='#3a3a7e', edgecolor='#00ff88',
-                                                linewidth=1)
-            ax.add_patch(pe_rect)
-            ax.text(px + 0.5, py + 0.5, f'PE{pe_idx+1}',
-                    ha='center', va='center', fontsize=7, color='#00ff88')
+        # Warps within workgroup
+        warp_positions = [(wx + 0.15, 2.7, 2.3), (wx + 2.65, 2.7, 2.3)]
+        for warp_idx, (warp_x, warp_y, warp_w) in enumerate(warp_positions):
+            warp_rect = mpatches.FancyBboxPatch((warp_x, warp_y), warp_w, 2.1,
+                                                  boxstyle="round,pad=0.05",
+                                                  facecolor='#333366', edgecolor='#ffaa00',
+                                                  linewidth=1.5, alpha=0.8)
+            ax.add_patch(warp_rect)
+            ax.text(warp_x + warp_w/2, warp_y + 1.9, f'Warp {warp_idx}',
+                    ha='center', va='center', fontsize=7, fontweight='bold', color='#ffaa00')
 
-    # Labels
-    ax.text(2.8, 0.5, 'Processing Elements (PEs)', ha='center', fontsize=7, color='#888888')
-    ax.text(7.2, 0.5, 'Processing Elements (PEs)', ha='center', fontsize=7, color='#888888')
+            # PEs within warp (2x2 grid)
+            for pe_idx in range(4):
+                px = warp_x + 0.15 + (pe_idx % 2) * 1.0
+                py = warp_y + 0.15 + (pe_idx // 2) * 0.85
+                pe_rect = mpatches.FancyBboxPatch((px, py), 0.8, 0.7,
+                                                    boxstyle="round,pad=0.03",
+                                                    facecolor='#3a3a7e', edgecolor='#00ff88',
+                                                    linewidth=0.8)
+                ax.add_patch(pe_rect)
+                pe_num = warp_idx * 4 + pe_idx
+                ax.text(px + 0.4, py + 0.35, f'PE{pe_num}',
+                        ha='center', va='center', fontsize=6, color='#00ff88')
+
+    # Shared memory label
+    ax.text(6, 0.4, 'Shared Memory per Workgroup  |  Native C: gpu_kernels.c (~27x matmul)',
+            ha='center', fontsize=7, color='#888888', style='italic')
 
     ax.set_facecolor('#0a0a1a')
     fig.patch.set_facecolor('#0a0a1a')
@@ -294,9 +307,9 @@ def test_growth():
     """Test suite growth chart."""
     fig, ax = plt.subplots(figsize=(8, 3.5))
 
-    versions = ['v1.0.0\nInitial', 'v1.1.0\nExpansion', 'v2.0.0\nCurrent']
-    test_counts = [113, 300, 594]
-    colors = ['#4a90d9', '#e8a838', '#50b86c']
+    versions = ['v1.0.0\nInitial', 'v1.1.0\nExpansion', 'v2.0.0\nCurrent', 'v2.1.0\nGPU']
+    test_counts = [113, 300, 594, 646]
+    colors = ['#4a90d9', '#e8a838', '#50b86c', '#88ccff']
 
     bars = ax.bar(versions, test_counts, color=colors, edgecolor='white', linewidth=1.5, width=0.5)
 
@@ -1075,7 +1088,7 @@ def test_coverage():
         ('ALU / Arithmetic', 22, '#9b59b6'),
         ('Assembler / TAL / Machine', 17, '#00ff88'),
         ('OS / Kernel', 38, '#ff66aa'),
-        ('GPU / SIMD / Packed', 50, '#88ccff'),
+        ('GPU / SIMD / Packed', 102, '#88ccff'),
         ('Conversion / Logic', 20, '#ffaa66'),
         ('Cache / Bus / DMA / IRQ', 48, '#aa88ff'),
         ('Profiler / Viz / VRAM', 38, '#66ffaa'),

@@ -417,10 +417,20 @@ Tensor operands accept immediate numbers or register names (R0–R3). When a reg
 
 ### GPU Mode
 
-A simulated GPU (`gpu.py`) extends the accelerator model with:
-- **ProcessingElement**: Individual trit-processing units
-- **Workgroup**: Groups of PEs sharing local memory
-- **TernaryGPU**: Full GPU hierarchy supporting kernel dispatch and parallel matmul
+A simulated GPU (`gpu.py`) extends the accelerator model with a four-level hierarchy:
+- **ProcessingElement**: Individual trit-processing units with local memory and `active` state
+- **Warp**: SIMT execution group — PEs in a warp execute the same instruction in lockstep
+- **Workgroup** (Thread Block): Groups of warps sharing local memory, with barrier synchronization
+- **TernaryGPU**: Full GPU with configurable `num_workgroups × pes_per_wg` cores (default: 4×16 = 64 cores, 16 warps)
+
+Additional features:
+- **Streams**: Multi-stream concurrent kernel execution
+- **Grid dispatch**: 2D thread block grid model (`dispatch_grid`)
+- **Parallel matmul**: Uses all PEs per workgroup, each computing different columns
+- **Reduction**: Parallel sum/max/min across all PEs
+- **Prefix scan**: Inclusive scan across data
+- **Fused operations**: `fused_linear` (matmul+bias+activation), `elementwise_fused` (chained ops)
+- **Native C acceleration**: `gpu_kernels.c` provides ~27x speedup for matmul, ~6.5x for reduction
 
 ### Visualization
 
@@ -431,6 +441,9 @@ ASCII rendering tools in `viz.py`:
 - `render_packed_trits()` — packed storage layout
 - `render_accelerator()` — accelerator state overview
 - `render_pipeline()` — accelerator pipeline stages
+- `render_gpu()` — full GPU architecture with workgroup/warp/PE hierarchy
+- `render_warp()` — individual warp state
+- `render_streams()` — stream queue/completion status
 
 ---
 

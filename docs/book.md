@@ -426,16 +426,21 @@
 ## Chapter 33 — GPU Mode and Parallel Computing
 
 - Module: `gpu.py` in `src/trinary/accelerator/` — a simulated GPU architecture for parallel computation
-- Three-level hierarchy: `ProcessingElement` → `Workgroup` → `TernaryGPU`
-  - `ProcessingElement`: the smallest compute unit, executes a single kernel thread with local register state
-  - `Workgroup`: a group of PEs sharing local memory and synchronization barriers
-  - `TernaryGPU`: the full GPU with configurable `PEs_per_wg × n_workgroups` processing elements
-- Kernel dispatch: kernels are Python callables distributed across all PEs. Each PE receives its global and local ID plus access to shared workgroup memory
-- Tensor pipelines: GPU-level dispatch for tensor operations (matmul, element-wise ops) with workgroup coordination
-- Parallel matmul: matrix multiplication decomposed into workgroups, each computing a tile of the result matrix. PEs within a workgroup collaborate on tile computation with barrier synchronization
-- ASCII visualization (`viz.py`): `render_simd_lanes`, `render_tensor_matrix`, `render_matmul`, `render_gpu_state` functions for terminal-based inspection of GPU state
-- 19 GPU mode + visualization tests
-- This chapter's code: writing a GPU kernel, dispatching it across workgroups, visualizing parallel execution
+- Four-level hierarchy: `ProcessingElement` → `Warp` → `Workgroup` → `TernaryGPU`
+  - `ProcessingElement`: the smallest compute unit, with local memory, result register, and `active` state
+  - `Warp`: SIMT execution group — PEs in a warp execute the same instruction in lockstep
+  - `Workgroup` (Thread Block): groups of warps sharing local memory and barrier synchronization
+  - `TernaryGPU`: the full GPU with configurable `num_workgroups × pes_per_wg` cores (default: 4×16 = 64 cores)
+- Kernel dispatch: `dispatch_kernel` distributes data across workgroups; `dispatch_grid` supports 2D thread block grids
+- Streams: multi-stream concurrent execution via `create_stream`, `dispatch_stream`, `run_streams_concurrent`
+- Parallel matmul: matrix multiplication using all PEs per workgroup, each computing different columns
+- Reduction: parallel `reduce()` for sum/max/min across all PEs
+- Prefix scan: inclusive `scan()` across data using parallel workgroups
+- Fused operations: `fused_linear` (matmul+bias+activation), `elementwise_fused` (chained ops)
+- Native C acceleration: `gpu_kernels.c` in `src/trinary/native/` provides ~27x speedup for matmul, ~6.5x for reduction
+- `gpu_native.py` bridges Python to C via ctypes; `USE_GPU_NATIVE` flag auto-selects C paths
+- ASCII visualization (`viz.py`): `render_gpu`, `render_warp`, `render_streams` for terminal-based GPU inspection
+- 71 GPU tests covering all features
 
 ---
 

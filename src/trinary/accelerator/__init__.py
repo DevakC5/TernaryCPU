@@ -26,6 +26,9 @@ from trinary.accelerator.viz import (
     render_packed_trits,
     render_accelerator,
     render_pipeline,
+    render_gpu,
+    render_warp,
+    render_streams,
 )
 
 __all__ = [
@@ -56,4 +59,7 @@ __all__ = [
     "render_packed_trits",
     "render_accelerator",
     "render_pipeline",
+    "render_gpu",
+    "render_warp",
+    "render_streams",
 ]

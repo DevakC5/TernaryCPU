@@ -4,6 +4,9 @@ Supports a list of layers, where each layer is a list of Perceptron
 instances. The forward pass propagates through layers sequentially.
 """
 
+import json
+import os
+
 from trinary.ai.perceptron import Perceptron
 
 
@@ -70,6 +73,55 @@ class TernaryNeuralNetwork:
                 outputs.append(neuron.forward(current))
             current = outputs
         return current
+
+    def save(self, filepath):
+        """Save network weights to a JSON file.
+
+        Args:
+            filepath: Path to save the model.
+        """
+        data = {
+            "format": "ternary_nn_v1",
+            "layer_sizes": self.layer_sizes,
+            "layers": [],
+        }
+        for layer in self.layers:
+            layer_data = []
+            for neuron in layer:
+                layer_data.append({
+                    "weights": list(neuron.weights),
+                    "bias": neuron.bias,
+                })
+            data["layers"].append(layer_data)
+
+        os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load(cls, filepath):
+        """Load a network from a JSON file.
+
+        Args:
+            filepath: Path to the saved model.
+
+        Returns:
+            TernaryNeuralNetwork instance.
+        """
+        with open(filepath, "r") as f:
+            data = json.load(f)
+
+        layers = []
+        for layer_data in data["layers"]:
+            layer = []
+            for neuron_data in layer_data:
+                layer.append(Perceptron(
+                    weights=list(neuron_data["weights"]),
+                    bias=neuron_data["bias"],
+                ))
+            layers.append(layer)
+
+        return cls(layers)
 
     def __repr__(self):
         return (

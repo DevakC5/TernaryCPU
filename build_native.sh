@@ -9,7 +9,7 @@ echo "Building libternary.so from $NATIVE_DIR"
 echo
 
 cd "$NATIVE_DIR"
-gcc -shared -fPIC -Wall -Wextra -std=c99 alu.c -o "$SCRIPT_DIR/src/trinary/libternary.so"
+gcc -shared -fPIC -Wall -Wextra -std=c99 alu.c gpu_kernels.c -o "$SCRIPT_DIR/src/trinary/libternary.so"
 
 echo "Success: libternary.so placed at src/trinary/libternary.so"
 echo

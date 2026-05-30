@@ -6,7 +6,7 @@ Ternary (base-3) computer simulation — logic gates, ALU, 27-opcode CPU, two-pa
 
 ```sh
 pip install -e .                              # one-time install; src/trinary is package root
-python -m pytest tests/ -v                    # 594 tests
+python -m pytest tests/ -v                    # 648 tests
 python -m pytest tests/test_cpu.py -v         # CPU instruction tests
 python -m pytest tests/ -k "cmp" -v           # keyword filter
 python -m trinary.os                          # legacy OS shell (TTY)
@@ -32,19 +32,25 @@ Key reference: [`ARCHITECTURE.md`](ARCHITECTURE.md) (732 lines) — full CPU spe
 | `docs/ui-guide.md` | 253 | PyQt6 desktop UI widgets |
 | `docs/tutorial.md` | 826 | 17-step walkthrough |
 | `docs/TODO.md` | 196 | Feature completeness status |
+| `docs/GRAPHICS_SYSTEM.md` | 175 | SDK graphics pipeline |
+| `docs/benchmarks.md` | 139 | Performance benchmarks |
+| `docs/book.md` | 451 | Extended book-format documentation |
+| `docs/devlog.md` | 541 | Development log |
 
 ## Academic paper
 
-`paper/` (45 files) — full 34-chapter LaTeX monograph (5974 lines `main.tex`) with 30 matplotlib-generated PDF diagrams. Build: `cd paper && bash build.sh`. Diagrams regenerated via `python generate_diagrams.py`.
+`paper/` (42 files) — full 34-chapter LaTeX monograph (5975 lines `main.tex`) with 30 matplotlib-generated PDF diagrams. Build: `cd paper && bash build.sh`. Diagrams regenerated via `python generate_diagrams.py`.
 
 ## Native backend
 
-C native layer (`libternary.so`) accelerates ALU ops. Not required — `native_backend.py` auto-probes paths via ctypes and falls back to pure Python. `NATIVE_AVAILABLE` tells callers whether acceleration loaded. Pre-built `.so` already lives in `src/trinary/`.
+C native layer (`libternary.so`) accelerates ALU ops and GPU kernels. Not required — `native_backend.py` / `gpu_native.py` auto-probe paths via ctypes and fall back to pure Python. `NATIVE_AVAILABLE` / `GPU_NATIVE_AVAILABLE` tell callers whether acceleration loaded. Pre-built `.so` already lives in `src/trinary/`.
 
 ```sh
 make -C src/trinary/native                    # produces src/trinary/libternary.so
 bash build_native.sh                          # alternative
 ```
+
+GPU native speedups (C vs Python): matmul ~27x, reduce ~6.5x, fused linear ~4.4x, scan ~2.6x. `gpu.py` uses `USE_GPU_NATIVE` flag to auto-select C paths.
 
 ## Architecture — dual display/OS subsystems
 
@@ -67,7 +73,7 @@ Package for ternary-based neural networks: `TritTensor`, `Perceptron`, `TernaryN
 ```sh
 python -m pytest tests/test_ternary_nn.py tests/test_activations.py tests/test_losses.py \
   tests/test_optimizers.py tests/test_perceptron.py tests/test_trainer.py \
-  tests/test_datasets.py tests/test_trit_tensor.py -v    # 128 NN tests (included in 594 total)
+  tests/test_datasets.py tests/test_trit_tensor.py -v    # 128 NN tests (included in 648 total)
 ```
 
 ## Key gotchas
@@ -85,6 +91,23 @@ python -m pytest tests/test_ternary_nn.py tests/test_activations.py tests/test_l
 - **Memory hooks**: `memory.register_write_hook(start, end, callback)` for VRAM auto-sync.
 - **No CI/lint/typecheck** — `pytest` is the only enforcement. Use `-s` and `--tb=short` for debugging.
 - **No conftest.py**, no pytest plugins.
+
+## MNIST training (`train_mnist.py`)
+
+Trains a ternary neural network on MNIST using Straight-Through Estimator (STE). Maintains real-valued weights during training, ternarized only for forward pass.
+
+```sh
+python train_mnist.py                                              # 500 train, 100 test, linear 784→10
+python train_mnist.py --epochs 200 --hidden 64                     # deeper network
+python train_mnist.py --train-size 5000                            # more data
+python train_mnist.py --lr 0.005 --seed 42                         # tuning
+```
+
+Current best: 784→10 linear model, 1000 train/50 epochs → 65% validation / 60.8% full test. Models saved to `models/`:
+- `mnist_model_best.json` — STE format (real-valued + ternary weights)
+- `mnist_model_tnn.json` — `TernaryNeuralNetwork`-compatible (ternary-only weights)
+
+Accuracy metric: argmax over output vector (like standard MNIST).
 
 ## TAL compiler (`src/trinary/tal.py`)
 

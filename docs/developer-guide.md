@@ -63,7 +63,7 @@ python -m pytest tests/ --cov=src/trinary
 | `test_cpu_stress.py` | 8 | Nested calls, heavy loops, random sequences |
 | `test_display.py` | 20 | DisplayMemoryMap, PixelDisplay, keyboard, STOREM/LOADM |
 | `test_accelerator.py` | 70 | Accelerator tensor ops |
-| `test_gpu.py` | 19 | GPU mode + visualization |
+| `test_gpu.py` | 71 | GPU mode, warps, streams, native C kernels, visualization |
 | `test_pipeline.py` | 19 | Clock, pipeline, hazards, timing |
 | `test_cache.py` | 10 | Cache hit/miss, write-back |
 | `test_branch_predictor.py` | 7 | Static + 2-bit saturating predictors |
@@ -321,7 +321,7 @@ Operands can be immediate numbers or registers (R0–R3). All six opcodes are su
 | Module | Description |
 |--------|-------------|
 | `accelerator_core.py` | Core accelerator: tensor storage, dispatch, ops |
-| `gpu.py` | Simulated GPU: ProcessingElement → Workgroup → TernaryGPU hierarchy |
+| `gpu.py` | Simulated GPU: ProcessingElement → Warp → Workgroup → TernaryGPU hierarchy, streams, native C acceleration |
 | `simd.py` | SIMD processor: vectorized arithmetic on packed trits |
 | `tensor_core.py` | Tensor core: matrix multiply-accumulate primitives |
 | `packed_trits.py` | Packed trit storage: 5 trits per byte |

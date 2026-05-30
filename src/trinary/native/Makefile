@@ -5,7 +5,7 @@ LDFLAGS = -shared
 LIB_DIR = .
 SRC_DIR = .
 
-_OBJ = alu.o
+_OBJ = alu.o gpu_kernels.o
 OBJ = $(patsubst %,$(SRC_DIR)/%,$(_OBJ))
 
 LIB = $(LIB_DIR)/libternary.so

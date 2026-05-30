@@ -2569,59 +2569,52 @@ tests.
 \chapter{GPU Mode and Parallel Computing}
 \label{ch:gpu}
 
-The simulated GPU (\texttt{gpu.py}) extends the accelerator model with a parallel
-processing hierarchy.
+The simulated GPU (\texttt{gpu.py}) extends the accelerator model with a four-level
+parallel processing hierarchy, native C acceleration, and multi-stream execution.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.72\textwidth]{gpu_hierarchy.pdf}
-\caption{GPU processing hierarchy — individual Processing Elements grouped into Workgroups, coordinated by the Ternary GPU controller}
+\caption{GPU processing hierarchy --- Processing Elements grouped into Warps, Warps into Workgroups, coordinated by the Ternary GPU controller}
 \label{fig:gpuhier}
 \end{figure}
 
 \section{Hierarchy}
 
 \begin{description}
-    \item[\textbf{Processing Element (PE)}]: The smallest compute unit, executing a
-          single kernel thread with local register state. Each PE receives its global
-          and local ID.
-    \item[\textbf{Workgroup}]: A group of PEs sharing local memory and synchronization
-          barriers. Workgroups enable cooperative computation on shared data.
+    \item[\textbf{Processing Element (PE)}]: The smallest compute unit, with local
+          packed memory, a result register, and an \texttt{active} flag.
+    \item[\textbf{Warp}]: A SIMT execution group---PEs execute the same instruction
+          in lockstep on different data.
+    \item[\textbf{Workgroup (Thread Block)}]: A group of warps sharing local memory
+          with barrier synchronization.
     \item[\textbf{TernaryGPU}]: The complete hierarchy with configurable
-          $\text{PEs\_per\_wg} \times n\_\text{workgroups}$ processing elements.
+          $\text{num\_workgroups} \times \text{pes\_per\_wg}$ cores (default: $4 \times 16 = 64$).
 \end{description}
 
 \section{Kernel Dispatch}
 
-Kernels are Python callables distributed across all PEs. The dispatch mechanism:
-\begin{enumerate}
-    \item Creates the PE grid based on configuration;
-    \item Assigns each PE its global and local indices;
-    \item Executes the kernel on each PE (or each workgroup for cooperative kernels);
-    \item Synchronizes workgroups at barrier points;
-    \item Collects results.
-\end{enumerate}
+Multiple dispatch models: \texttt{dispatch\_kernel} (workgroup-level),
+\texttt{dispatch\_grid} (2D thread block grid), \texttt{batch\_dispatch}
+(one PE per batch element).
 
-\section{Parallel Matrix Multiplication}
+\section{Streams and Concurrency}
 
-Matrix multiplication is decomposed into workgroups, each computing a tile of the
-result matrix. PEs within a workgroup collaborate on tile computation with barrier
-synchronization. This demonstrates the classic tiled matmul algorithm adapted for
-ternary arithmetic.
+Multi-stream execution via \texttt{create\_stream}, \texttt{dispatch\_stream},
+and \texttt{run\_streams\_concurrent} for overlapping computation.
 
-The GPU mode is validated by 19 tests including kernel dispatch, tensor pipeline
-execution, and visualization rendering.
+\section{Parallel Operations}
 
-\section{Visualization}
+Parallel matmul (all PEs per workgroup compute different columns), reduction
+(sum/max/min), prefix scan, fused linear (\texttt{activation(W $\cdot$ x + b)}),
+and elementwise fused ops.
 
-ASCII rendering tools in \texttt{viz.py}:
-\begin{verbatim}
-render_simd_lanes(trit_values)    → SIMD lane activity bar
-render_tensor_matrix(data)        → 2D tensor content
-render_matmul(A, B, result)       → Matrix multiplication stages
-render_gpu_state(gpu)             → Full GPU state overview
-render_packed_trits(data)         → Packed storage layout
-\end{verbatim}
+\section{Native C Acceleration}
+
+Hot loops in C (\texttt{gpu\_kernels.c}) provide $\sim$27$\times$ speedup for matmul,
+$\sim$6.5$\times$ for reduction, $\sim$4.4$\times$ for fused linear.
+
+The GPU is validated by 71 tests covering warps, streams, native C, and visualization.
 
 %====================================================================
 \chapter{SIMD and Packed Storage}
@@ -4262,7 +4255,7 @@ Test File & Focus & Tests \\
 \texttt{test\_display.py} & Text display, keyboard, STOREM/LOADM & 20 \\
 \texttt{test\_display\_framebuffer.py} & Framebuffer display & 20 \\
 \texttt{test\_dma.py} & DMA transfers, concurrency & 7 \\
-\texttt{test\_gpu.py} & GPU mode, kernel dispatch, visualization & 19 \\
+\texttt{test\_gpu.py} & GPU mode, warps, streams, native C, visualization & 71 \\
 \texttt{test\_interrupts.py} & Interrupt controller (8-line) & 8 \\
 \texttt{test\_losses.py} & Neural network loss functions & 10 \\
 \texttt{test\_native\_backend.py} & Native C bridge (ctypes) & 11 \\
