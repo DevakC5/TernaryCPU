@@ -1,0 +1,381 @@
+\contentsline {part}{I\hspace {1em}Foundations}{14}{part.1}%
+\contentsline {chapter}{\numberline {1}Introduction to Ternary Computing}{16}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Binary and Its Alternatives}{16}{section.1.1}%
+\contentsline {section}{\numberline {1.2}The Optimal Radix Problem}{16}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Historical Ternary Computers}{17}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Motivation for Trinary}{18}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Scope of This Monograph}{18}{section.1.5}%
+\contentsline {chapter}{\numberline {2}Comparison to Related Systems}{20}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Historical Ternary Computers}{20}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Setun (1958--1965)}{20}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Setun-70 (1970)}{20}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}TTL-Based Experimental Machines}{21}{subsection.2.1.3}%
+\contentsline {section}{\numberline {2.2}Comparison to Trinary}{21}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Multiple-Valued Logic Research}{21}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Related Emulation Projects}{22}{section.2.4}%
+\contentsline {chapter}{\numberline {3}System Architecture Overview}{23}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Five-Layer Abstraction Stack}{23}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Package Structure}{24}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Complete System Stack}{25}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Memory Maps}{26}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Number Representation}{26}{section.3.5}%
+\contentsline {chapter}{\numberline {4}Environment Setup and Testing}{28}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Prerequisites and Installation}{28}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Running Tests}{28}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Running the System}{28}{section.4.3}%
+\contentsline {chapter}{\numberline {5}Trit: The Fundamental Unit}{29}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Definition}{29}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Digit Efficiency}{29}{section.5.2}%
+\contentsline {chapter}{\numberline {6}Base Conversion Systems}{31}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Conversion Algorithms}{31}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Edge Case Handling}{31}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Validation}{32}{section.6.3}%
+\contentsline {chapter}{\numberline {7}Ternary Logic Gates}{33}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Definitions}{33}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Truth Tables}{34}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Algebraic Properties}{34}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Composite Gates}{34}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Implementation}{35}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Logical Completeness}{35}{section.7.6}%
+\contentsline {chapter}{\numberline {8}Adder Circuits}{36}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Native Ternary Adder}{36}{section.8.1}%
+\contentsline {subsection}{\numberline {8.1.1}Half Adder}{36}{subsection.8.1.1}%
+\contentsline {subsection}{\numberline {8.1.2}Full Adder}{37}{subsection.8.1.2}%
+\contentsline {subsection}{\numberline {8.1.3}Ripple-Carry Adder}{37}{subsection.8.1.3}%
+\contentsline {subsection}{\numberline {8.1.4}Limitations}{38}{subsection.8.1.4}%
+\contentsline {section}{\numberline {8.2}Native Signed-Magnitude Arithmetic}{38}{section.8.2}%
+\contentsline {chapter}{\numberline {9}Native Signed-Magnitude Arithmetic}{39}{chapter.9}%
+\contentsline {subsection}{\numberline {9.0.1}Native Addition and Subtraction}{39}{subsection.9.0.1}%
+\contentsline {subsection}{\numberline {9.0.2}Native Multiplication}{40}{subsection.9.0.2}%
+\contentsline {subsection}{\numberline {9.0.3}Native Division}{40}{subsection.9.0.3}%
+\contentsline {section}{\numberline {9.1}Context: When Each Path Is Used}{40}{section.9.1}%
+\contentsline {section}{\numberline {9.2}Formal Correctness of Native Addition}{41}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Definitions}{41}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Theorem}{41}{subsection.9.2.2}%
+\contentsline {subsection}{\numberline {9.2.3}Proof Sketch}{41}{subsection.9.2.3}%
+\contentsline {section}{\numberline {9.3}Scope of Correctness}{41}{section.9.3}%
+\contentsline {chapter}{\numberline {10}The Arithmetic Logic Unit}{43}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Supported Operations}{43}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Padding for Logical Operations}{43}{section.10.2}%
+\contentsline {section}{\numberline {10.3}Comparison Flags}{44}{section.10.3}%
+\contentsline {chapter}{\numberline {11}The Register File}{45}{chapter.11}%
+\contentsline {section}{\numberline {11.1}RegisterFile API}{45}{section.11.1}%
+\contentsline {chapter}{\numberline {12}Memory Architecture}{46}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Specification}{46}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Address Space Layout (Default 512-Cell Memory)}{47}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Complete Address Space Map}{47}{section.12.3}%
+\contentsline {section}{\numberline {12.4}API}{48}{section.12.4}%
+\contentsline {section}{\numberline {12.5}Write Hooks}{48}{section.12.5}%
+\contentsline {part}{II\hspace {1em}CPU Architecture}{49}{part.2}%
+\contentsline {chapter}{\numberline {13}CPU Design: Fetch-Decode-Execute}{51}{chapter.13}%
+\contentsline {section}{\numberline {13.1}CPU State}{51}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Execution Cycle (Fast Mode)}{52}{section.13.2}%
+\contentsline {section}{\numberline {13.3}Cycle Costs}{52}{section.13.3}%
+\contentsline {section}{\numberline {13.4}Complete Opcode Map}{53}{section.13.4}%
+\contentsline {section}{\numberline {13.5}Encoding Bit Layout}{54}{section.13.5}%
+\contentsline {subsection}{\numberline {13.5.1}Format A (OP dst src): 5 trits}{55}{subsection.13.5.1}%
+\contentsline {subsection}{\numberline {13.5.2}Format B (OP reg): 4 trits}{55}{subsection.13.5.2}%
+\contentsline {subsection}{\numberline {13.5.3}Format C (OP dst value): 4+ trits}{55}{subsection.13.5.3}%
+\contentsline {subsection}{\numberline {13.5.4}Format D (OP addr): 3+ trits}{55}{subsection.13.5.4}%
+\contentsline {subsection}{\numberline {13.5.5}Format E (OP): 3 trits}{55}{subsection.13.5.5}%
+\contentsline {subsection}{\numberline {13.5.6}Format M (OP addr reg): 4+ trits}{55}{subsection.13.5.6}%
+\contentsline {subsection}{\numberline {13.5.7}Format L (TLOADW): TID + addr}{56}{subsection.13.5.7}%
+\contentsline {subsection}{\numberline {13.5.8}Format S2 (TSTOREW): same as Format L}{56}{subsection.13.5.8}%
+\contentsline {subsection}{\numberline {13.5.9}Format A3 (tensor arith): TID operand}{56}{subsection.13.5.9}%
+\contentsline {chapter}{\numberline {14}Data Movement Instructions}{58}{chapter.14}%
+\contentsline {section}{\numberline {14.1}LOAD -- Load Immediate}{58}{section.14.1}%
+\contentsline {section}{\numberline {14.2}MOV -- Move Register}{58}{section.14.2}%
+\contentsline {section}{\numberline {14.3}CLR -- Clear Register}{59}{section.14.3}%
+\contentsline {section}{\numberline {14.4}Use Cases}{59}{section.14.4}%
+\contentsline {chapter}{\numberline {15}Arithmetic and Logical Instructions}{60}{chapter.15}%
+\contentsline {section}{\numberline {15.1}Arithmetic Instructions}{60}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Logical Instructions}{61}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Flag Semantics}{61}{section.15.3}%
+\contentsline {chapter}{\numberline {16}Comparison and Control Flow}{62}{chapter.16}%
+\contentsline {section}{\numberline {16.1}Comparison}{62}{section.16.1}%
+\contentsline {section}{\numberline {16.2}Branch Instructions}{62}{section.16.2}%
+\contentsline {section}{\numberline {16.3}Pattern: Conditional Execution}{63}{section.16.3}%
+\contentsline {chapter}{\numberline {17}Subroutines: CALL and RET}{64}{chapter.17}%
+\contentsline {section}{\numberline {17.1}Mechanism}{64}{section.17.1}%
+\contentsline {section}{\numberline {17.2}Stack Overflow Risk}{64}{section.17.2}%
+\contentsline {section}{\numberline {17.3}Design Rationale}{65}{section.17.3}%
+\contentsline {section}{\numberline {17.4}Calling Convention}{65}{section.17.4}%
+\contentsline {chapter}{\numberline {18}Stack Operations: PUSH and POP}{66}{chapter.18}%
+\contentsline {section}{\numberline {18.1}Mechanism}{66}{section.18.1}%
+\contentsline {section}{\numberline {18.2}Error Conditions}{67}{section.18.2}%
+\contentsline {section}{\numberline {18.3}Typical Usage}{67}{section.18.3}%
+\contentsline {chapter}{\numberline {19}Memory Access Instructions}{68}{chapter.19}%
+\contentsline {section}{\numberline {19.1}Address Modes}{68}{section.19.1}%
+\contentsline {section}{\numberline {19.2}Use in Data Structures}{69}{section.19.2}%
+\contentsline {chapter}{\numberline {20}The Interrupt System}{70}{chapter.20}%
+\contentsline {section}{\numberline {20.1}Interrupt Vector Table}{70}{section.20.1}%
+\contentsline {section}{\numberline {20.2}Interrupt Instructions}{70}{section.20.2}%
+\contentsline {section}{\numberline {20.3}Interrupt Flow}{70}{section.20.3}%
+\contentsline {chapter}{\numberline {21}Timer and Interrupt-Driven Execution}{72}{chapter.21}%
+\contentsline {section}{\numberline {21.1}Timer Mechanism}{72}{section.21.1}%
+\contentsline {section}{\numberline {21.2}Timing Accuracy}{72}{section.21.2}%
+\contentsline {section}{\numberline {21.3}Preemptive Multitasking Pattern}{73}{section.21.3}%
+\contentsline {section}{\numberline {21.4}Example: Timer-Driven Counter}{73}{section.21.4}%
+\contentsline {section}{\numberline {21.5}Practical Considerations}{74}{section.21.5}%
+\contentsline {part}{III\hspace {1em}Toolchain}{75}{part.3}%
+\contentsline {chapter}{\numberline {22}The Two-Pass Assembler}{77}{chapter.22}%
+\contentsline {section}{\numberline {22.1}Assembly Syntax}{77}{section.22.1}%
+\contentsline {section}{\numberline {22.2}Pass 1: Symbol Table Construction}{77}{section.22.2}%
+\contentsline {section}{\numberline {22.3}Pass 2: Branch Resolution}{78}{section.22.3}%
+\contentsline {chapter}{\numberline {23}Machine Code Encoding and Decoding}{79}{chapter.23}%
+\contentsline {section}{\numberline {23.1}Encoder}{79}{section.23.1}%
+\contentsline {section}{\numberline {23.2}Decoder}{79}{section.23.2}%
+\contentsline {section}{\numberline {23.3}Unmapped Instructions}{80}{section.23.3}%
+\contentsline {chapter}{\numberline {24}The TAL Compiler}{81}{chapter.24}%
+\contentsline {section}{\numberline {24.1}Language Syntax}{81}{section.24.1}%
+\contentsline {section}{\numberline {24.2}Compilation Flow}{82}{section.24.2}%
+\contentsline {section}{\numberline {24.3}Snake Game}{82}{section.24.3}%
+\contentsline {part}{IV\hspace {1em}Software Environment}{83}{part.4}%
+\contentsline {chapter}{\numberline {25}Memory-Mapped Display and Keyboard}{85}{chapter.25}%
+\contentsline {section}{\numberline {25.1}Legacy Text Display}{85}{section.25.1}%
+\contentsline {subsection}{\numberline {25.1.1}Character Addressing}{85}{subsection.25.1.1}%
+\contentsline {subsection}{\numberline {25.1.2}Rendering Rules}{85}{subsection.25.1.2}%
+\contentsline {section}{\numberline {25.2}SDK Framebuffer Display}{86}{section.25.2}%
+\contentsline {subsection}{\numberline {25.2.1}Pixel Addressing}{86}{subsection.25.2.1}%
+\contentsline {subsection}{\numberline {25.2.2}Dirty-Rect Tracking}{86}{subsection.25.2.2}%
+\contentsline {section}{\numberline {25.3}Keyboard Input}{86}{section.25.3}%
+\contentsline {paragraph}{Legacy (address 260):}{86}{section.25.3}%
+\contentsline {paragraph}{SDK (addresses 9000--9001):}{86}{section.25.3}%
+\contentsline {section}{\numberline {25.4}Write Hooks}{87}{section.25.4}%
+\contentsline {chapter}{\numberline {26}The Operating System Shell}{88}{chapter.26}%
+\contentsline {section}{\numberline {26.1}Legacy OS (\textsf {os.py})}{88}{section.26.1}%
+\contentsline {section}{\numberline {26.2}Modular SDK OS (\textsf {os/} package)}{89}{section.26.2}%
+\contentsline {subsection}{\numberline {26.2.1}SDK OS Commands}{89}{subsection.26.2.1}%
+\contentsline {subsection}{\numberline {26.2.2}Kernel Architecture}{89}{subsection.26.2.2}%
+\contentsline {chapter}{\numberline {27}The PyQt6 Visual Simulator}{91}{chapter.27}%
+\contentsline {section}{\numberline {27.1}Widgets}{91}{section.27.1}%
+\contentsline {section}{\numberline {27.2}Controls}{92}{section.27.2}%
+\contentsline {section}{\numberline {27.3}Theme}{92}{section.27.3}%
+\contentsline {chapter}{\numberline {28}Games and Demos}{93}{chapter.28}%
+\contentsline {section}{\numberline {28.1}Legacy CPU Demos}{93}{section.28.1}%
+\contentsline {section}{\numberline {28.2}SDK Games}{94}{section.28.2}%
+\contentsline {section}{\numberline {28.3}Running Demos}{95}{section.28.3}%
+\contentsline {section}{\numberline {28.4}In-Depth Game Walkthroughs}{95}{section.28.4}%
+\contentsline {subsection}{\numberline {28.4.1}Snake Deluxe: Circular Buffer Pattern}{95}{subsection.28.4.1}%
+\contentsline {subsection}{\numberline {28.4.2}Pong: Physics and AI}{96}{subsection.28.4.2}%
+\contentsline {subsection}{\numberline {28.4.3}Breakout: Brick Grid and Collision}{96}{subsection.28.4.3}%
+\contentsline {subsection}{\numberline {28.4.4}Particles: Fountain Effect}{97}{subsection.28.4.4}%
+\contentsline {subsection}{\numberline {28.4.5}Tilemap Scroller: Camera and World}{97}{subsection.28.4.5}%
+\contentsline {subsection}{\numberline {28.4.6}RPG Movement: Collision Grid}{98}{subsection.28.4.6}%
+\contentsline {chapter}{\numberline {29}The TAL Compiler (Extended)}{99}{chapter.29}%
+\contentsline {section}{\numberline {29.1}Compiler Architecture}{99}{section.29.1}%
+\contentsline {section}{\numberline {29.2}Compilation Examples}{99}{section.29.2}%
+\contentsline {section}{\numberline {29.3}Array Access}{100}{section.29.3}%
+\contentsline {chapter}{\numberline {30}The Dual Display System}{101}{chapter.30}%
+\contentsline {section}{\numberline {30.1}Design Goals}{101}{section.30.1}%
+\contentsline {section}{\numberline {30.2}Package Structure}{101}{section.30.2}%
+\contentsline {section}{\numberline {30.3}Components}{102}{section.30.3}%
+\contentsline {section}{\numberline {30.4}Memory Configuration Considerations}{102}{section.30.4}%
+\contentsline {chapter}{\numberline {31}The Fantasy Console SDK}{104}{chapter.31}%
+\contentsline {section}{\numberline {31.1}Architecture}{104}{section.31.1}%
+\contentsline {section}{\numberline {31.2}Components}{104}{section.31.2}%
+\contentsline {section}{\numberline {31.3}Cartridge Format}{105}{section.31.3}%
+\contentsline {section}{\numberline {31.4}Sprite Operations}{105}{section.31.4}%
+\contentsline {section}{\numberline {31.5}TileMap Features}{106}{section.31.5}%
+\contentsline {section}{\numberline {31.6}Public API}{106}{section.31.6}%
+\contentsline {part}{V\hspace {1em}Acceleration}{107}{part.5}%
+\contentsline {chapter}{\numberline {32}The Tensor Accelerator Coprocessor}{109}{chapter.32}%
+\contentsline {section}{\numberline {32.1}Architecture}{109}{section.32.1}%
+\contentsline {section}{\numberline {32.2}Tensor ISA}{109}{section.32.2}%
+\contentsline {section}{\numberline {32.3}Tensor Operations in Detail}{110}{section.32.3}%
+\contentsline {paragraph}{TLOADW:}{110}{section.32.3}%
+\contentsline {paragraph}{TSTOREW:}{110}{section.32.3}%
+\contentsline {paragraph}{TVECADD:}{110}{section.32.3}%
+\contentsline {paragraph}{TMATMUL:}{110}{section.32.3}%
+\contentsline {paragraph}{TDOT:}{110}{section.32.3}%
+\contentsline {paragraph}{TACT:}{110}{section.32.3}%
+\contentsline {section}{\numberline {32.4}Tensor Memory Management}{110}{section.32.4}%
+\contentsline {section}{\numberline {32.5}Performance Characteristics}{111}{section.32.5}%
+\contentsline {section}{\numberline {32.6}Integration with CPU Pipeline}{111}{section.32.6}%
+\contentsline {chapter}{\numberline {33}GPU Mode and Parallel Computing}{112}{chapter.33}%
+\contentsline {section}{\numberline {33.1}Hierarchy}{112}{section.33.1}%
+\contentsline {section}{\numberline {33.2}Kernel Dispatch}{113}{section.33.2}%
+\contentsline {section}{\numberline {33.3}Streams and Concurrency}{113}{section.33.3}%
+\contentsline {section}{\numberline {33.4}Parallel Operations}{113}{section.33.4}%
+\contentsline {section}{\numberline {33.5}Native C Acceleration}{114}{section.33.5}%
+\contentsline {chapter}{\numberline {34}SIMD and Packed Storage}{115}{chapter.34}%
+\contentsline {section}{\numberline {34.1}SIMD Processor}{115}{section.34.1}%
+\contentsline {section}{\numberline {34.2}Pipeline Integration}{115}{section.34.2}%
+\contentsline {section}{\numberline {34.3}Packed Trit Storage}{116}{section.34.3}%
+\contentsline {subsection}{\numberline {34.3.1}Encoding Scheme}{116}{subsection.34.3.1}%
+\contentsline {subsection}{\numberline {34.3.2}API}{116}{subsection.34.3.2}%
+\contentsline {section}{\numberline {34.4}Test Coverage}{117}{section.34.4}%
+\contentsline {chapter}{\numberline {35}Native C Backend}{118}{chapter.35}%
+\contentsline {section}{\numberline {35.1}Architecture}{118}{section.35.1}%
+\contentsline {section}{\numberline {35.2}Building}{118}{section.35.2}%
+\contentsline {section}{\numberline {35.3}Exposed C Functions}{119}{section.35.3}%
+\contentsline {section}{\numberline {35.4}C Implementation Details}{119}{section.35.4}%
+\contentsline {section}{\numberline {35.5}Auto-Discovery and Fallback}{120}{section.35.5}%
+\contentsline {section}{\numberline {35.6}Performance Benchmarks}{120}{section.35.6}%
+\contentsline {paragraph}{Overall execution rate:}{120}{table.caption.37}%
+\contentsline {part}{VI\hspace {1em}Hardware Simulation}{121}{part.6}%
+\contentsline {chapter}{\numberline {36}Hardware Microarchitecture Simulation}{123}{chapter.36}%
+\contentsline {section}{\numberline {36.1}Clock Module}{123}{section.36.1}%
+\contentsline {section}{\numberline {36.2}Five-Stage Pipeline}{124}{section.36.2}%
+\contentsline {subsection}{\numberline {36.2.1}Pipeline Stage Lifecycle}{124}{subsection.36.2.1}%
+\contentsline {subsection}{\numberline {36.2.2}Pipeline Controller}{125}{subsection.36.2.2}%
+\contentsline {subsection}{\numberline {36.2.3}Fetch and Stall}{125}{subsection.36.2.3}%
+\contentsline {subsection}{\numberline {36.2.4}Visualization}{125}{subsection.36.2.4}%
+\contentsline {section}{\numberline {36.3}Hazard Unit}{126}{section.36.3}%
+\contentsline {subsection}{\numberline {36.3.1}Hazard Detection}{126}{subsection.36.3.1}%
+\contentsline {subsection}{\numberline {36.3.2}Load-Use Hazards}{126}{subsection.36.3.2}%
+\contentsline {section}{\numberline {36.4}L1 Cache System}{127}{section.36.4}%
+\contentsline {subsection}{\numberline {36.4.1}CacheLine Structure}{127}{subsection.36.4.1}%
+\contentsline {subsection}{\numberline {36.4.2}Cache Controller}{128}{subsection.36.4.2}%
+\contentsline {subsection}{\numberline {36.4.3}Read and Write Operations}{128}{subsection.36.4.3}%
+\contentsline {subsection}{\numberline {36.4.4}Hit Rate Tracking}{128}{subsection.36.4.4}%
+\contentsline {section}{\numberline {36.5}Branch Predictor}{129}{section.36.5}%
+\contentsline {subsection}{\numberline {36.5.1}Prediction Flow}{129}{subsection.36.5.1}%
+\contentsline {subsection}{\numberline {36.5.2}CPU Integration}{129}{subsection.36.5.2}%
+\contentsline {section}{\numberline {36.6}System Bus}{130}{section.36.6}%
+\contentsline {subsection}{\numberline {36.6.1}Bus Protocol}{130}{subsection.36.6.1}%
+\contentsline {subsection}{\numberline {36.6.2}Arbitration}{131}{subsection.36.6.2}%
+\contentsline {section}{\numberline {36.7}DMA Controller}{131}{section.36.7}%
+\contentsline {subsection}{\numberline {36.7.1}Transfer Model}{131}{subsection.36.7.1}%
+\contentsline {subsection}{\numberline {36.7.2}Operation}{132}{subsection.36.7.2}%
+\contentsline {section}{\numberline {36.8}VRAM Controller}{132}{section.36.8}%
+\contentsline {subsection}{\numberline {36.8.1}Timing Parameters}{132}{subsection.36.8.1}%
+\contentsline {subsection}{\numberline {36.8.2}Operation}{132}{subsection.36.8.2}%
+\contentsline {section}{\numberline {36.9}Interrupt Controller}{133}{section.36.9}%
+\contentsline {subsection}{\numberline {36.9.1}Interrupt Flow}{133}{subsection.36.9.1}%
+\contentsline {subsection}{\numberline {36.9.2}CPU Integration}{133}{subsection.36.9.2}%
+\contentsline {section}{\numberline {36.10}Profiler}{134}{section.36.10}%
+\contentsline {subsection}{\numberline {36.10.1}Recording Methods}{134}{subsection.36.10.1}%
+\contentsline {subsection}{\numberline {36.10.2}Derived Metrics}{134}{subsection.36.10.2}%
+\contentsline {subsection}{\numberline {36.10.3}Output Formats}{134}{subsection.36.10.3}%
+\contentsline {section}{\numberline {36.11}CPU Integration Architecture}{135}{section.36.11}%
+\contentsline {subsection}{\numberline {36.11.1}Hardware Initialization}{135}{subsection.36.11.1}%
+\contentsline {subsection}{\numberline {36.11.2}Per-Cycle Execution Flow}{135}{subsection.36.11.2}%
+\contentsline {subsection}{\numberline {36.11.3}Instruction Latency Table}{136}{subsection.36.11.3}%
+\contentsline {section}{\numberline {36.12}Overhead and Performance Characteristics}{136}{section.36.12}%
+\contentsline {section}{\numberline {36.13}Hardware Simulation Test Suite}{137}{section.36.13}%
+\contentsline {chapter}{\numberline {37}Pipeline Hazards and Forwarding}{138}{chapter.37}%
+\contentsline {section}{\numberline {37.1}Read-After-Write (RAW) Hazards}{138}{section.37.1}%
+\contentsline {subsection}{\numberline {37.1.1}Forwarding Paths}{138}{subsection.37.1.1}%
+\contentsline {subsection}{\numberline {37.1.2}Hazard Detection Algorithm}{139}{subsection.37.1.2}%
+\contentsline {section}{\numberline {37.2}Load-Use Hazards}{139}{section.37.2}%
+\contentsline {subsection}{\numberline {37.2.1}Stall Insertion}{139}{subsection.37.2.1}%
+\contentsline {section}{\numberline {37.3}Control Hazards and Branch Misprediction}{140}{section.37.3}%
+\contentsline {section}{\numberline {37.4}Structural Hazards}{140}{section.37.4}%
+\contentsline {section}{\numberline {37.5}Metrics}{140}{section.37.5}%
+\contentsline {section}{\numberline {37.6}Cycle-by-Cycle Trace Example}{141}{section.37.6}%
+\contentsline {subsection}{\numberline {37.6.1}Program}{141}{subsection.37.6.1}%
+\contentsline {subsection}{\numberline {37.6.2}Assumptions}{141}{subsection.37.6.2}%
+\contentsline {subsection}{\numberline {37.6.3}Trace}{141}{subsection.37.6.3}%
+\contentsline {subsection}{\numberline {37.6.4}Key Observations}{142}{subsection.37.6.4}%
+\contentsline {subsection}{\numberline {37.6.5}With Load-Use Hazard}{142}{subsection.37.6.5}%
+\contentsline {chapter}{\numberline {38}Cache Architecture}{144}{chapter.38}%
+\contentsline {section}{\numberline {38.1}N-Way Set-Associative Organisation}{144}{section.38.1}%
+\contentsline {subsection}{\numberline {38.1.1}CacheSet Structure}{144}{subsection.38.1.1}%
+\contentsline {subsection}{\numberline {38.1.2}Parameters}{145}{subsection.38.1.2}%
+\contentsline {section}{\numberline {38.2}Replacement Policy: LRU}{145}{section.38.2}%
+\contentsline {section}{\numberline {38.3}Write Policy: Write-Allocate, Write-Back}{145}{section.38.3}%
+\contentsline {section}{\numberline {38.4}Hit Rate Simulation}{146}{section.38.4}%
+\contentsline {section}{\numberline {38.5}Flush Operations}{146}{section.38.5}%
+\contentsline {chapter}{\numberline {39}Bus, DMA, and Interrupt Controller}{147}{chapter.39}%
+\contentsline {section}{\numberline {39.1}System Bus Arbitration}{147}{section.39.1}%
+\contentsline {subsection}{\numberline {39.1.1}Bus Request Structure}{147}{subsection.39.1.1}%
+\contentsline {subsection}{\numberline {39.1.2}Arbitration}{147}{subsection.39.1.2}%
+\contentsline {subsection}{\numberline {39.1.3}Burst Mode}{147}{subsection.39.1.3}%
+\contentsline {subsection}{\numberline {39.1.4}Split Transactions}{148}{subsection.39.1.4}%
+\contentsline {section}{\numberline {39.2}DMA Controller}{148}{section.39.2}%
+\contentsline {subsection}{\numberline {39.2.1}Transfer Lifecycle}{148}{subsection.39.2.1}%
+\contentsline {subsection}{\numberline {39.2.2}Use Cases}{149}{subsection.39.2.2}%
+\contentsline {section}{\numberline {39.3}Interrupt Controller}{149}{section.39.3}%
+\contentsline {subsection}{\numberline {39.3.1}Interrupt Lifecycle}{149}{subsection.39.3.1}%
+\contentsline {subsection}{\numberline {39.3.2}Nested Interrupts}{149}{subsection.39.3.2}%
+\contentsline {chapter}{\numberline {40}Profiler and Performance Analysis}{150}{chapter.40}%
+\contentsline {section}{\numberline {40.1}Architecture}{150}{section.40.1}%
+\contentsline {section}{\numberline {40.2}Derived Metrics}{150}{section.40.2}%
+\contentsline {subsection}{\numberline {40.2.1}CPI and IPC}{150}{subsection.40.2.1}%
+\contentsline {subsection}{\numberline {40.2.2}Stall Breakdown}{150}{subsection.40.2.2}%
+\contentsline {subsection}{\numberline {40.2.3}Cache and Branch Metrics}{151}{subsection.40.2.3}%
+\contentsline {section}{\numberline {40.3}CSV Export}{151}{section.40.3}%
+\contentsline {section}{\numberline {40.4}Performance Results}{151}{section.40.4}%
+\contentsline {section}{\numberline {40.5}Sample Report}{151}{section.40.5}%
+\contentsline {chapter}{\numberline {41}Power and Energy Model}{153}{chapter.41}%
+\contentsline {section}{\numberline {41.1}Switching Activity Model}{153}{section.41.1}%
+\contentsline {subsection}{\numberline {41.1.1}Binary Baseline}{153}{subsection.41.1.1}%
+\contentsline {section}{\numberline {41.2}Simulated Switching Activity}{154}{section.41.2}%
+\contentsline {section}{\numberline {41.3}Energy-per-Instruction Estimate}{154}{section.41.3}%
+\contentsline {section}{\numberline {41.4}Limitations of the Model}{155}{section.41.4}%
+\contentsline {section}{\numberline {41.5}Key Insight}{155}{section.41.5}%
+\contentsline {part}{VII\hspace {1em}Artificial Intelligence}{156}{part.7}%
+\contentsline {chapter}{\numberline {42}Ternary Neural Networks}{158}{chapter.42}%
+\contentsline {section}{\numberline {42.1}Signed-Offset Encoding}{158}{section.42.1}%
+\contentsline {section}{\numberline {42.2}Activation Functions}{159}{section.42.2}%
+\contentsline {section}{\numberline {42.3}TritTensor Data Structure}{159}{section.42.3}%
+\contentsline {subsection}{\numberline {42.3.1}Constructor and Validation}{160}{subsection.42.3.1}%
+\contentsline {subsection}{\numberline {42.3.2}Operations}{160}{subsection.42.3.2}%
+\contentsline {section}{\numberline {42.4}Perceptron}{160}{section.42.4}%
+\contentsline {subsection}{\numberline {42.4.1}Forward Pass}{160}{subsection.42.4.1}%
+\contentsline {section}{\numberline {42.5}TernaryNeuralNetwork}{161}{section.42.5}%
+\contentsline {section}{\numberline {42.6}Loss Functions}{161}{section.42.6}%
+\contentsline {section}{\numberline {42.7}Optimizers}{161}{section.42.7}%
+\contentsline {subsection}{\numberline {42.7.1}SGDOptimizer}{162}{subsection.42.7.1}%
+\contentsline {subsection}{\numberline {42.7.2}BackpropOptimizer}{162}{subsection.42.7.2}%
+\contentsline {section}{\numberline {42.8}TernaryTrainer}{163}{section.42.8}%
+\contentsline {subsection}{\numberline {42.8.1}Training Loop}{163}{subsection.42.8.1}%
+\contentsline {subsection}{\numberline {42.8.2}Training Paths}{163}{subsection.42.8.2}%
+\contentsline {subsection}{\numberline {42.8.3}Evaluation and Convenience Methods}{163}{subsection.42.8.3}%
+\contentsline {section}{\numberline {42.9}Datasets}{163}{section.42.9}%
+\contentsline {section}{\numberline {42.10}Training Behaviour and Limitations}{164}{section.42.10}%
+\contentsline {section}{\numberline {42.11}Visualization and Demos}{164}{section.42.11}%
+\contentsline {section}{\numberline {42.12}Performance Benchmarks}{165}{section.42.12}%
+\contentsline {section}{\numberline {42.13}Test Coverage}{165}{section.42.13}%
+\contentsline {part}{VIII\hspace {1em}Web Visualizer}{167}{part.8}%
+\contentsline {chapter}{\numberline {43}Web-Based Visualizer Interface}{169}{chapter.43}%
+\contentsline {section}{\numberline {43.1}System Architecture}{169}{section.43.1}%
+\contentsline {section}{\numberline {43.2}Backend: FastAPI Web Server}{170}{section.43.2}%
+\contentsline {subsection}{\numberline {43.2.1}SnapshotEngine}{170}{subsection.43.2.1}%
+\contentsline {subsection}{\numberline {43.2.2}SystemSnapshot Data Contract}{171}{subsection.43.2.2}%
+\contentsline {subsection}{\numberline {43.2.3}REST Endpoints}{171}{subsection.43.2.3}%
+\contentsline {subsection}{\numberline {43.2.4}WebSocket Protocol}{171}{subsection.43.2.4}%
+\contentsline {subsection}{\numberline {43.2.5}WebSocket Message Format}{172}{subsection.43.2.5}%
+\contentsline {section}{\numberline {43.3}Frontend: React + TypeScript}{172}{section.43.3}%
+\contentsline {subsection}{\numberline {43.3.1}Component Architecture}{173}{subsection.43.3.1}%
+\contentsline {subsection}{\numberline {43.3.2}SimulatorPage Layout}{173}{subsection.43.3.2}%
+\contentsline {paragraph}{Header toolbar:}{173}{subsection.43.3.2}%
+\contentsline {paragraph}{Left panel (fixed 320px width):}{173}{subsection.43.3.2}%
+\contentsline {paragraph}{Centre panel (flexible width):}{173}{subsection.43.3.2}%
+\contentsline {subsection}{\numberline {43.3.3}WebSocket Hook}{174}{subsection.43.3.3}%
+\contentsline {subsection}{\numberline {43.3.4}State Management}{174}{subsection.43.3.4}%
+\contentsline {subsection}{\numberline {43.3.5}Visual Design}{175}{subsection.43.3.5}%
+\contentsline {section}{\numberline {43.4}Integration with the Trinary System}{175}{section.43.4}%
+\contentsline {section}{\numberline {43.5}Deployment}{175}{section.43.5}%
+\contentsline {subsection}{\numberline {43.5.1}Backend}{175}{subsection.43.5.1}%
+\contentsline {subsection}{\numberline {43.5.2}Frontend}{176}{subsection.43.5.2}%
+\contentsline {part}{IX\hspace {1em}Conclusions}{177}{part.9}%
+\contentsline {chapter}{\numberline {44}Conclusions and Future Work}{179}{chapter.44}%
+\contentsline {section}{\numberline {44.1}Summary of Contributions}{179}{section.44.1}%
+\contentsline {section}{\numberline {44.2}Key Findings}{180}{section.44.2}%
+\contentsline {subsection}{\numberline {44.2.1}Ternary Arithmetic via Native Signed-Magnitude Logic}{180}{subsection.44.2.1}%
+\contentsline {subsection}{\numberline {44.2.2}Pipeline Efficiency}{180}{subsection.44.2.2}%
+\contentsline {subsection}{\numberline {44.2.3}SDK Viability}{180}{subsection.44.2.3}%
+\contentsline {subsection}{\numberline {44.2.4}Ternary Neural Networks}{180}{subsection.44.2.4}%
+\contentsline {section}{\numberline {44.3}Future Work}{181}{section.44.3}%
+\contentsline {subsection}{\numberline {44.3.1}Hardware Implementation}{181}{subsection.44.3.1}%
+\contentsline {subsection}{\numberline {44.3.2}Enhanced Pipeline}{181}{subsection.44.3.2}%
+\contentsline {subsection}{\numberline {44.3.3}Compiler Optimisation}{181}{subsection.44.3.3}%
+\contentsline {subsection}{\numberline {44.3.4}Network and Distributed Computing}{182}{subsection.44.3.4}%
+\contentsline {subsection}{\numberline {44.3.5}Additional Hardware Features}{182}{subsection.44.3.5}%
+\contentsline {subsection}{\numberline {44.3.6}Expanded Neural Network Framework}{182}{subsection.44.3.6}%
+\contentsline {section}{\numberline {44.4}Closing Remarks}{182}{section.44.4}%
+\contentsline {chapter}{\numberline {A}Test Suite Reference}{183}{appendix.A}%
+\contentsline {chapter}{\numberline {B}Performance Benchmarks}{186}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Digit Efficiency: Ternary vs.\ Binary}{186}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Execution Rate}{187}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Native C Backend Speedup}{187}{section.B.3}%
+\contentsline {section}{\numberline {B.4}Hardware Simulation Overhead}{187}{section.B.4}%
+\contentsline {section}{\numberline {B.5}Memory Usage}{188}{section.B.5}%
+\contentsline {section}{\numberline {B.6}SDK / Fantasy Console Performance}{188}{section.B.6}%
+\contentsline {section}{\numberline {B.7}Test Suite Growth}{188}{section.B.7}%
+\contentsline {chapter}{\numberline {C}Developer Reference}{189}{appendix.C}%
+\contentsline {section}{\numberline {C.1}Adding a New Instruction}{189}{section.C.1}%
+\contentsline {section}{\numberline {C.2}Adding a New ALU Operation}{189}{section.C.2}%
+\contentsline {section}{\numberline {C.3}Building and Running}{189}{section.C.3}%
