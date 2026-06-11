@@ -51,7 +51,7 @@ from trinary.alu import alu
 from trinary.memory import Memory
 from trinary.accelerator import TernaryTensorAccelerator
 from trinary.hardware import (
-    Clock, Pipeline, HazardUnit, Cache, BranchPredictor,
+    Clock, Pipeline, HazardUnit, StructuralHazardUnit, Cache, BranchPredictor,
     Bus, DMA, InterruptController, Profiler,
     get_latency, is_branch,
 )
@@ -70,8 +70,8 @@ class CPU:
     OPCODES = {
         "LOAD", "MOV", "CLR",
         "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
-        "CMP", "JMP", "JZ", "JNZ",
-        "PUSH", "POP", "CALL", "RET", "HALT",
+        "CMP", "JMP", "JZ", "JNZ", "JMPR", "JZR", "JNZR",
+        "PUSH", "POP", "CALL", "CALLR", "RET", "HALT",
         "STOREM", "LOADM",
         "INT", "IRET", "EI", "DI", "SETIVT", "SETTIMER",
         "TLOADW", "TSTOREW", "TVECADD", "TMATMUL", "TDOT", "TACT",
@@ -83,9 +83,9 @@ class CPU:
         "ADD": 1, "SUB": 1, "MUL": 3, "DIV": 5,
         "AND": 1, "OR": 1, "NOT": 1,
         "CMP": 1,
-        "JMP": 1, "JZ": 1, "JNZ": 1,
+        "JMP": 1, "JZ": 1, "JNZ": 1, "JMPR": 1, "JZR": 1, "JNZR": 1,
         "PUSH": 2, "POP": 2,
-        "CALL": 3, "RET": 3,
+        "CALL": 3, "CALLR": 3, "RET": 3,
         "HALT": 1,
         "STOREM": 2, "LOADM": 2,
         "INT": 8, "IRET": 8,
@@ -132,6 +132,7 @@ class CPU:
         self.clock = self._shared_clock if self._shared_clock else Clock()
         self.pipeline = Pipeline()
         self.hazard = HazardUnit()
+        self.structural_hazard = StructuralHazardUnit()
         self.icache = Cache(name=f"L1I_C{self.core_id}", size_bytes=256, line_size=8)
         self.dcache = Cache(name=f"L1D_C{self.core_id}", size_bytes=256, line_size=8)
         self.bp = BranchPredictor(mode='two_bit')
@@ -369,15 +370,35 @@ class CPU:
             self.pc = addr
             return
 
+        elif opcode == "JMPR":
+            from trinary.conversion import ternary_to_decimal as t2d
+            addr = t2d(self.registers.store(operands[0]))
+            self.pc = addr
+            return
+
         elif opcode == "JZ":
             if self.flags["ZERO"] or self.flags["EQUAL"]:
                 addr = int(operands[0])
                 self.pc = addr
                 return
 
+        elif opcode == "JZR":
+            if self.flags["ZERO"] or self.flags["EQUAL"]:
+                from trinary.conversion import ternary_to_decimal as t2d
+                addr = t2d(self.registers.store(operands[0]))
+                self.pc = addr
+                return
+
         elif opcode == "JNZ":
             if not self.flags["ZERO"] and not self.flags["EQUAL"]:
                 addr = int(operands[0])
+                self.pc = addr
+                return
+
+        elif opcode == "JNZR":
+            if not self.flags["ZERO"] and not self.flags["EQUAL"]:
+                from trinary.conversion import ternary_to_decimal as t2d
+                addr = t2d(self.registers.store(operands[0]))
                 self.pc = addr
                 return
 
@@ -405,6 +426,17 @@ class CPU:
             self._write_memory(self.sp, d2t(return_addr))
             self.sp -= 1
             addr = int(operands[0])
+            self.pc = addr
+            return
+
+        elif opcode == "CALLR":
+            return_addr = self.pc + 1
+            if self.sp < self.STACK_MIN:
+                raise StackOverflowError("Stack overflow")
+            from trinary.conversion import decimal_to_ternary as d2t, ternary_to_decimal as t2d
+            self._write_memory(self.sp, d2t(return_addr))
+            self.sp -= 1
+            addr = t2d(self.registers.store(operands[0]))
             self.pc = addr
             return
 
@@ -717,13 +749,21 @@ class CPU:
         cost = 1
 
         if not self.halted and self.pc < len(self.program):
-            instr_str = self.program[self.pc]
-            parts = instr_str.strip().split()
-            opcode = parts[0].upper() if parts else ""
-            operands = parts[1:] if len(parts) > 1 else []
-            lat = get_latency(opcode)
+            # Structural hazard: memory port conflict check
+            mem_active = self.pipeline.mem_stage is not None and not getattr(self.pipeline.mem_stage, 'bubble', True)
+            if_active = not getattr(self.pipeline.if_stage, 'bubble', True)
+            if self.structural_hazard.check_mem_port(if_active, mem_active):
+                # IF stalls this cycle — skip fetch
+                cost += 1
+                self.profiler.record_stall('structural')
+            else:
+                instr_str = self.program[self.pc]
+                parts = instr_str.strip().split()
+                opcode = parts[0].upper() if parts else ""
+                operands = parts[1:] if len(parts) > 1 else []
+                lat = get_latency(opcode)
 
-            self.pipeline.fetch(instr_str, opcode, operands, cycles=lat)
+                self.pipeline.fetch(instr_str, opcode, operands, cycles=lat)
 
             if is_branch(opcode):
                 cost += self._execute_branch(instr_str, opcode, operands)
@@ -753,16 +793,16 @@ class CPU:
 
     def _execute_branch(self, instr_str, opcode, operands):
         """Execute a branch instruction with prediction tracking."""
-        if opcode == "JMP":
+        if opcode in ("JMP", "JMPR"):
             self.pipeline.flush()
             self.profiler.record_stall('control')
             self.execute_instruction(instr_str)
             self.bp.update(self.pc, True)
             return 2
 
-        if opcode in ("JZ", "JNZ"):
-            should = (opcode == "JZ" and self.flags.get("ZERO", False)) or \
-                     (opcode == "JNZ" and not self.flags.get("ZERO", False))
+        if opcode in ("JZ", "JNZ", "JZR", "JNZR"):
+            should = (opcode in ("JZ", "JZR") and self.flags.get("ZERO", False)) or \
+                     (opcode in ("JNZ", "JNZR") and not self.flags.get("ZERO", False))
             predicted = self.bp.predict(self.pc)
             self.execute_instruction(instr_str)
             if predicted != should:
@@ -776,7 +816,7 @@ class CPU:
             self.bp.update(self.pc, should)
             return 1
 
-        if opcode == "CALL":
+        if opcode in ("CALL", "CALLR"):
             self.execute_instruction(instr_str)
             self.bp.update(self.pc, True)
             return 1

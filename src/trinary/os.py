@@ -3,6 +3,9 @@
 Boots into a command shell. Uses memory-mapped display (200-255)
 for output and keyboard buffer (260) for input.
 
+DEPRECATED: Use ``trinary.os`` package (``os/`` directory) for the
+new modular OS implementation with SDK display support.
+
 Memory:
    0       cursor offset (ternary)
    1-32    input buffer characters
@@ -11,6 +14,12 @@ Memory:
    200-255 VRAM
    260     keyboard buffer
 """
+
+import warnings
+warnings.warn(
+    "legacy os.py is deprecated; use the trinary.os package (os/ directory) instead.",
+    DeprecationWarning, stacklevel=2
+)
 
 from trinary.cpu import CPU
 from trinary.assembler import Assembler

@@ -1,6 +1,6 @@
 # Instruction Set Reference
 
-Complete technical reference for all 27 Trinary CPU instructions.
+Complete technical reference for all 31 Trinary CPU instructions.
 
 ---
 
@@ -446,6 +446,60 @@ JNZ loop         # Jump if R0 != R1
 
 ---
 
+### JMPR — Jump Indirect via Register
+
+```
+JMPR R_src
+```
+
+Unconditionally jumps to the address stored in register `R_src`.
+
+| Field | Description |
+|-------|-------------|
+| Format | B |
+| Cycles | 1 |
+| Flags affected | None |
+
+**Examples:**
+```asm
+LOAD R0 11       # R0 = address 4 (decimal)
+JMPR R0          # Jump to address 4
+```
+
+---
+
+### JZR — Jump if Zero via Register
+
+```
+JZR R_src
+```
+
+Jumps to the address stored in `R_src` if ZERO or EQUAL flag is True.
+
+| Field | Description |
+|-------|-------------|
+| Format | B |
+| Cycles | 1 |
+| Flags affected | None |
+
+---
+
+### JNZR — Jump if Not Zero via Register
+
+```
+JNZR R_src
+```
+
+Jumps to the address stored in `R_src` if BOTH ZERO and EQUAL flags are False.
+
+| Field | Description |
+|-------|-------------|
+| Format | B |
+| Cycles | 1 |
+| Flags affected | None |
+
+---
+
 ## Subroutine Instructions
 
 ### CALL — Call Subroutine
@@ -474,7 +528,7 @@ my_func:
     RET
 ```
 
-**Note:** CALL/RET use a separate Python-list call stack, NOT the memory stack (PUSH/POP). The two stacks are independent.
+**Note:** CALL/RET use the same hardware memory stack (SP) as PUSH/POP. Return addresses and data share the 128-cell stack region (128–255).
 
 ---
 
@@ -493,6 +547,28 @@ Pops a return address from the call stack and continues execution there.
 | Flags affected | None |
 
 **Error:** `StackUnderflowError` if call stack is empty.
+
+---
+
+### CALLR — Call Subroutine Indirect via Register
+
+```
+CALLR R_src
+```
+
+Pushes (PC + 1) to the hardware stack and jumps to the address stored in `R_src`.
+
+| Field | Description |
+|-------|-------------|
+| Format | B |
+| Cycles | 3 |
+| Flags affected | None |
+
+**Examples:**
+```asm
+LOAD R0 11       # Load function address into R0
+CALLR R0         # Call function via register
+```
 
 ---
 

@@ -29,7 +29,7 @@ Use `-s` and `--tb=short` for debugging.
 | File | What |
 |------|------|
 | `ARCHITECTURE.md` (745ℓ) | Full CPU spec, memory map, pipeline, interrupts |
-| `docs/instruction-set.md` (1139ℓ) | All 27 opcodes, cycle costs, operand types |
+| `docs/instruction-set.md` (1215ℓ) | All 31 opcodes, cycle costs, operand types |
 | `docs/developer-guide.md` (705ℓ) | Setup, testing, adding instructions |
 | `docs/FANTASY_CONSOLE.md` (351ℓ) | SDK reference |
 | `docs/TERNARY_OS.md` (163ℓ) | Dual OS internals |
@@ -39,12 +39,17 @@ Use `-s` and `--tb=short` for debugging.
 ## Gotchas
 
 - **CPU default**: `CPU()` → `Memory(512)`. For framebuffer SDK path: `CPU(memory=Memory(10000))` — keyboard at 9000, VRAM at 1000–5095.
-- **CPU realistic timing**: `CPU(realistic_timing=True)` enables pipeline, cache, branch predictor, DMA, bus, interrupt controller, profiler.
+- **CPU realistic timing**: `CPU(realistic_timing=True)` enables pipeline, cache, branch predictor, DMA, bus, interrupt controller, profiler, and structural hazard unit.
 - **Unified hardware stack**: PUSH/POP/CALL/RET/INT/IRET all use the same physical memory stack (SP grows down 255→128). No separate Python call stack. CALL/RET can overflow.
 - **Native signed-magnitude arithmetic**: ALU uses `arithmetic.py` which implements ADD/SUB/MUL/DIV on ternary strings directly (no decimal round-trip). `adder.py` (ripple-carry) handles non-negative magnitude core.
 - **Interrupts auto-save context**: INT/timer interrupts push R0–R3, flags, PC to the hardware stack; IRET restores them. Handlers cannot communicate via registers.
+- **Register-indirect addressing**: JMPR, JZR, JNZR, CALLR allow computed jumps via register (opcodes 203–206, format B). Enables function pointers and computed dispatch.
+- **Audio**: `sfx()` queues tones; `audio.flush()` writes WAV file to `audio_output/`. Not real-time — file-based output.
+- **VRAM read bandwidth**: VRAMController now limits both reads and writes per frame (symmetric `check_read()` / `check_write()`).
+- **Structural hazards**: Memory-port conflicts (IF vs. MEM) and ALU contention modeled in `StructuralHazardUnit`. Tracked in profiler.
+- **TAL peephole optimizer**: Removes redundant PUSH/POP pairs and duplicate LOAD to same register.
 - **Signed-magnitude negatives**: leading `-` (e.g., `"-10"` = −3 decimal). Not balanced ternary.
-- **`machine.py`** encodes 27 opcodes. No ternary encoding for INT/IRET/EI/DI/SETIVT/SETTIMER.
+- **`machine.py`** encodes 31 opcodes (27 original + 4 register-indirect: JMPR/JZR/JNZR/CALLR). No ternary encoding for INT/IRET/EI/DI/SETIVT/SETTIMER.
 - **BackpropOptimizer** replaces per-neuron SGD for multi-layer `TernaryNeuralNetwork` — computes true gradients through hidden layers in {-1,0,+1} space with STE. `TernaryHillClimber` is deprecated.
 - **Cache** is N-way set-associative with LRU (not direct-mapped). Default associativity=2. `Bus` supports burst mode and split transactions.
 - **`__init__.py`** at `src/trinary/` re-exports types from `ai` (TritTensor, Perceptron, TernaryNeuralNetwork) and `accelerator` (PackedTritArray, TritSIMD, TensorCore, etc.).

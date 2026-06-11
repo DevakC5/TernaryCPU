@@ -456,7 +456,7 @@ Trinary follows a five-layer abstraction stack, each layer building on the one b
     \item \textbf{ALU Layer}: Arithmetic and logical operations via native signed-magnitude
           arithmetic (with ripple-carry adder for the magnitude core).
           Implemented in \code{alu.py}, \code{arithmetic.py}, and \code{adder.py}.
-    \item \textbf{CPU Layer}: Fetch-decode-execute cycle with 27 opcodes, 4 general-
+    \item \textbf{CPU Layer}: Fetch-decode-execute cycle with 31 opcodes, 4 general-
           purpose registers, unified hardware stack (SP, used by PUSH/POP/CALL/RET/INT/IRET),
           interrupt system with automatic context save/restore, and timer. Implemented in \code{cpu.py}.
     \item \textbf{Assembler Layer}: Two-pass assembly with symbolic labels and
@@ -487,7 +487,7 @@ src/trinary/
 ├── alu.py               Arithmetic logic unit
 ├── registers.py         Register file (R0-R3)
 ├── memory.py            Addressable RAM
-├── cpu.py               CPU (27 opcodes, dual stacks, interrupts)
+├── cpu.py               CPU (31 opcodes, unified stack, interrupts)
 ├── assembler.py         Two-pass assembler
 ├── machine.py           Machine-code encoder/decoder
 ├── tal.py               TAL structured-language compiler
@@ -518,10 +518,10 @@ The full system stack, from hardware primitives to application software:
 │  (two-pass: labels→addresses, branch resolution)              │
 ├──────────────────────────────────────────────────────────────┤
 │  MACHINE CODE ENCODER / DECODER                              │
-│  (assembly <-> ternary opcode strings, 27 opcodes)              │
+│  (assembly <-> ternary opcode strings, 31 opcodes)              │
 ├──────────────────────────────────────────────────────────────┤
 │  CPU                                                         │
-│  (fetch-decode-execute, 27 opcodes, 4 regs, 512/10000B RAM) │
+│  (fetch-decode-execute, 31 opcodes, 4 regs, 512/10000B RAM) │
 ├──────────────────────┬───────────────────────────────────────┤
 │  ACCELERATOR COPROC  │  HARDWARE SIMULATION                  │
 │  (TensorMemory, SIMD,│  (Pipeline, Cache, Branch Pred,      │
@@ -1370,7 +1370,7 @@ writes without polling.
 \index{CPU}\index{fetch-decode-execute}\index{pipeline!five-stage}
 
 The CPU, implemented in \code{cpu.py}, is the core of the Trinary system. It
-implements a classic fetch-decode-execute cycle with 27 opcodes.
+implements a classic fetch-decode-execute cycle with 31 opcodes.
 
 \begin{figure}[H]
 \centering
@@ -1450,7 +1450,7 @@ TMATMUL & 20 & Tensor matrix multiply \\
 The full opcode map assigns a 3-trit ternary opcode to each instruction:
 
 \begin{longtable}{cllllc}
-\caption{Complete opcode map (27 opcodes)}
+\caption{Complete opcode map (31 opcodes)
 \label{tab:opcodelong} \\
 \toprule
 Ternary & Decimal & Mnemonic & Format & Cycles & Description \\
@@ -1484,6 +1484,10 @@ Ternary & Decimal & Mnemonic & Format & Cycles & Description \\
 200 & 18 & DIV     & A  & 5 & Divide registers \\
 201 & 19 & STOREM  & M  & 2 & Store register to memory \\
 202 & 20 & LOADM   & M  & 2 & Load memory into register \\
+203 & 21 & JMPR    & B  & 1 & Jump indirect via register \\
+204 & 22 & JZR     & B  & 1 & Jump if zero/equal via register \\
+205 & 23 & JNZR    & B  & 1 & Jump if not-zero via register \\
+206 & 24 & CALLR   & B  & 3 & Call subroutine indirect via register \\
 210 & 28 & TVECADD & A3 & 4 & Tensor vector add, TID$\rightarrow$R0 \\
 211 & 29 & TMATMUL & A3 & 20 & Tensor matrix multiply, TID$\rightarrow$R0 \\
 212 & 30 & TDOT    & A3 & 6 & Tensor dot product, scalar$\rightarrow$R0 \\
@@ -1494,8 +1498,8 @@ Ternary & Decimal & Mnemonic & Format & Cycles & Description \\
 
 \section{Encoding Bit Layout}
 
-Each 3-trit opcode is a base-3 number from 000 to 222 (decimal 0--26, but
-decimal 21--27 are unused). The 3-trit value encodes the operation class
+Each 3-trit opcode is a base-3 number from 000 to 222 (decimal 0--26, with
+decimal 25--27 unused and 28--33 used by tensor opcodes). The 3-trit value encodes the operation class
 and specific operation within that class:
 
 \begin{table}[H]
@@ -2975,8 +2979,9 @@ Runtime.run(update_fn, render_fn)
     \item[\code{Input}]: \code{btn(name)} returns held state; \code{btnp(name)}
           returns edge-triggered press. Eight-button mapping: UP, DOWN, LEFT, RIGHT,
           A, B, X, Y.
-    \item[\code{Audio}]: Stub system (\code{sfx(freq, duration)}) that accepts
-          requests but has no mixing backend yet.
+    \item[\code{Audio}]: WAV-file output system (\code{sfx(freq, duration)}) that
+          mixes queued beeps into a PCM buffer and writes a WAV file on \code{flush()}.
+          Supports simultaneous tones through additive mixing.
     \item[\code{Cartridge}]: JSON format bundling sprites, tilemaps, palette,
           metadata, and code. \code{Cartridge.load(path)} and
           \code{Cartridge.save(path)}.
@@ -4264,16 +4269,31 @@ RET (indirect) & Flush entire pipeline & 2~cycles \\
 
 \section{Structural Hazards}
 
-No structural hazards occur in the current design. Each pipeline
-resource is statically allocated per stage, so no two instructions
-require the same resource simultaneously.
+Two structural hazards are modeled via the \code{StructuralHazardUnit}:
+
+\begin{description}
+    \item[Memory port conflict]: The IF stage and MEM stage share a single
+          memory port. When both stages need access in the same cycle, IF
+          stalls and MEM proceeds, adding one cycle of structural hazard
+          penalty.
+    \item[ALU contention]: The EX stage (arithmetic operations) and the
+          address-generation unit (AGU) share the ALU. When both need it
+          simultaneously, the AGU stalls.
+\end{description}
+
+These hazards are relatively rare in the demo-program workload but
+become significant with memory-heavy or address-heavy instruction
+sequences. The \code{StructuralHazardUnit} tracks \code{mem\_port\_conflicts},
+\code{alu\_conflicts}, and \code{total\_structural\_stalls} for profiling.
 
 \section{Metrics}
 
 The \code{HazardUnit} tracks \code{stalls\_inserted} and
-\code{forwards\_detected}. For the demo programs, 5--15\% of
-instructions trigger a forwarding event, and fewer than 1\% require
-a load-use stall.
+\code{forwards\_detected}. The \code{StructuralHazardUnit} tracks
+memory-port and ALU conflicts. For the demo programs, 5--15\% of
+instructions trigger a forwarding event, fewer than 1\% require
+a load-use stall, and structural hazards add 0--3\% cycle overhead
+depending on the program.
 
 \section{Cycle-by-Cycle Trace Example}
 
@@ -5790,9 +5810,9 @@ Test File & Focus & Tests \\
 \code{test\_assembler.py} & Two-pass assembler, labels, comments & 5 \\
 \code{test\_branch\_predictor.py} & Static and dynamic prediction & 7 \\
 \code{test\_bus.py} & System bus arbitration & 7 \\
-\code{test\_cache.py} & Direct-mapped L1 cache & 10 \\
+\code{test\_cache.py} & N-way set-associative L1 cache & 10 \\
 \code{test\_conversion.py} & Ternary/decimal/binary conversion & 10 \\
-\code{test\_cpu.py} & All 27 opcodes, flags, stacks, interrupts & 24 \\
+\code{test\_cpu.py} & All 31 opcodes, flags, stacks, interrupts & 24 \\
 \code{test\_cpu\_accelerator.py} & CPU + accelerator integration & 11 \\
 \code{test\_cpu\_stress.py} & Nested calls, heavy loops, random sequences & 8 \\
 \code{test\_datasets.py} & Neural network datasets & 10 \\

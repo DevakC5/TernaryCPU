@@ -1,4 +1,62 @@
-"""Hazard detection and forwarding for the 5-stage pipeline."""
+"""Hazard detection and forwarding for the 5-stage pipeline.
+
+Structural hazards modeled:
+- Single memory port: IF and MEM stages cannot both access memory in the same cycle
+- Single ALU: EX stage cannot execute arithmetic while AGU computes an address
+"""
+
+
+class StructuralHazardUnit:
+    """Tracks structural resource contention in the pipeline."""
+
+    def __init__(self):
+        self.mem_port_conflicts = 0
+        self.alu_conflicts = 0
+        self.total_stalls = 0
+
+    def check_mem_port(self, if_active, mem_active):
+        """Check if IF and MEM both need the memory port.
+
+        Args:
+            if_active: True if IF stage is fetching this cycle
+            mem_active: True if MEM stage is doing a load/store this cycle
+
+        Returns:
+            bool: True if IF must stall (MEM has priority)
+        """
+        if if_active and mem_active:
+            self.mem_port_conflicts += 1
+            self.total_stalls += 1
+            return True  # IF stalls, MEM proceeds
+        return False
+
+    def check_alu(self, ex_alu_active, agu_active):
+        """Check if EX and AGU both need the ALU.
+
+        Args:
+            ex_alu_active: True if EX stage needs ALU for arithmetic
+            agu_active: True if AGU needs ALU for address calculation
+
+        Returns:
+            bool: True if AGU must stall
+        """
+        if ex_alu_active and agu_active:
+            self.alu_conflicts += 1
+            self.total_stalls += 1
+            return True  # AGU stalls, EX proceeds
+        return False
+
+    def reset(self):
+        self.mem_port_conflicts = 0
+        self.alu_conflicts = 0
+        self.total_stalls = 0
+
+    def stats(self):
+        return {
+            "mem_port_conflicts": self.mem_port_conflicts,
+            "alu_conflicts": self.alu_conflicts,
+            "total_structural_stalls": self.total_stalls,
+        }
 
 
 class HazardUnit:

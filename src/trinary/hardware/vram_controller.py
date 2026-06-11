@@ -17,6 +17,7 @@ class VRAMController:
         self.fps = fps
         self.bandwidth_bytes_per_frame = bandwidth_bytes_per_frame
         self._write_bytes_this_frame = 0
+        self._read_bytes_this_frame = 0
         self._scanline = 0
         self._frame = 0
         self._cycle = 0
@@ -49,6 +50,7 @@ class VRAMController:
             self._frame += 1
             self._frame_ticks = 0
             self._write_bytes_this_frame = 0
+            self._read_bytes_this_frame = 0
             self._scanline = 0
         self._scanline = (self._frame_ticks // self.cycles_per_scanline) % self.scanlines_per_frame
         return {
@@ -56,6 +58,7 @@ class VRAMController:
             "scanline": self._scanline,
             "frame_ticks": self._frame_ticks,
             "write_bytes": self._write_bytes_this_frame,
+            "read_bytes": self._read_bytes_this_frame,
         }
 
     def check_write(self, num_bytes=1):
@@ -71,13 +74,24 @@ class VRAMController:
         self.total_writes += num_bytes
         return True
 
-    def read_ok(self):
-        self.total_reads += 1
+    def check_read(self, num_bytes=1):
+        """Check if a read of num_bytes is allowed this frame.
+
+        Returns:
+            bool: True if read allowed, False if bandwidth exceeded (stall).
+        """
+        if self._read_bytes_this_frame + num_bytes > self.bandwidth_bytes_per_frame:
+            self._stalled_cycles += 1
+            return False
+        self._read_bytes_this_frame += num_bytes
+        self.total_reads += num_bytes
         return True
 
     @property
     def bandwidth_used_pct(self):
-        return (self._write_bytes_this_frame / max(1, self.bandwidth_bytes_per_frame)) * 100
+        writes = self._write_bytes_this_frame
+        reads = self._read_bytes_this_frame
+        return ((writes + reads) / max(1, self.bandwidth_bytes_per_frame)) * 100
 
     @property
     def stalled(self):
@@ -85,6 +99,7 @@ class VRAMController:
 
     def reset(self):
         self._write_bytes_this_frame = 0
+        self._read_bytes_this_frame = 0
         self._scanline = 0
         self._frame = 0
         self._cycle = 0

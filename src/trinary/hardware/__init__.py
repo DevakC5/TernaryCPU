@@ -2,7 +2,7 @@
 
 from trinary.hardware.clock import Clock
 from trinary.hardware.pipeline import Pipeline, PipelineStage
-from trinary.hardware.hazards import HazardUnit
+from trinary.hardware.hazards import HazardUnit, StructuralHazardUnit
 from trinary.hardware.cache import Cache, CacheLine
 from trinary.hardware.branch_predictor import BranchPredictor
 from trinary.hardware.bus import Bus, BusRequest
@@ -22,6 +22,7 @@ __all__ = [
     "Pipeline",
     "PipelineStage",
     "HazardUnit",
+    "StructuralHazardUnit",
     "Cache",
     "CacheLine",
     "BranchPredictor",

@@ -36,15 +36,15 @@ class Assembler:
     OPCODES = {
         "LOAD", "MOV", "CLR",
         "ADD", "SUB", "MUL", "DIV", "AND", "OR", "NOT",
-        "CMP", "JMP", "JZ", "JNZ",
-        "PUSH", "POP", "CALL", "RET", "HALT",
+        "CMP", "JMP", "JZ", "JNZ", "JMPR", "JZR", "JNZR",
+        "PUSH", "POP", "CALL", "CALLR", "RET", "HALT",
         "STOREM", "LOADM",
         "INT", "IRET", "EI", "DI", "SETIVT", "SETTIMER",
         "TLOADW", "TSTOREW", "TVECADD", "TMATMUL", "TDOT", "TACT",
         "TCAS",
     }
 
-    BRANCH_OPCODES = {"JMP", "JZ", "JNZ", "CALL"}
+    BRANCH_OPCODES = {"JMP", "JZ", "JNZ", "CALL", "JMPR", "JZR", "JNZR", "CALLR"}
 
     def __init__(self):
         self.labels = {}

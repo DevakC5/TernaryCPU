@@ -7,8 +7,9 @@ INSTRUCTION_LATENCIES = {
     "AND": 1, "OR": 1, "NOT": 1,
     "CMP": 1,
     "JMP": 1, "JZ": 1, "JNZ": 1,
+    "JMPR": 1, "JZR": 1, "JNZR": 1,
     "PUSH": 2, "POP": 2,
-    "CALL": 3, "RET": 3,
+    "CALL": 3, "CALLR": 3, "RET": 3,
     "HALT": 1,
     "STOREM": 2, "LOADM": 2,
     "INT": 3, "IRET": 3,
@@ -42,7 +43,7 @@ def get_latency(opcode):
 
 
 def is_branch(opcode):
-    return opcode in ("JMP", "JZ", "JNZ", "CALL")
+    return opcode in ("JMP", "JZ", "JNZ", "CALL", "JMPR", "JZR", "JNZR", "CALLR")
 
 
 def is_load(opcode):

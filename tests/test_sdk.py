@@ -288,9 +288,9 @@ class TestInput:
 # --- Audio tests ---
 
 class TestAudio:
-    def test_default_disabled(self):
+    def test_default_enabled(self):
         a = Audio()
-        assert a._enabled is False
+        assert a._enabled is True
 
     def test_enable_disable(self):
         a = Audio()

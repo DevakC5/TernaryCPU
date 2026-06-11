@@ -57,6 +57,10 @@ OPCODE_MAP = {
     "DIV": "200",
     "STOREM": "201",
     "LOADM": "202",
+    "JMPR": "203",    # Jump indirect via register
+    "JZR": "204",     # Jump if zero via register
+    "JNZR": "205",    # Jump if not zero via register
+    "CALLR": "206",   # Call indirect via register
     "TVECADD": "210",
     "TMATMUL": "211",
     "TDOT": "212",
@@ -170,8 +174,10 @@ def encode_instruction(instr, labels=None):
             addr_ternary = decimal_to_ternary(int(addr))
         return op_code + reg + addr_ternary
 
-    if opcode in ("JMP", "JZ", "JNZ", "CALL"):
+    if opcode in ("JMP", "JZ", "JNZ", "CALL", "JMPR", "JZR", "JNZR", "CALLR"):
         addr = operands[0]
+        if opcode in ("JMPR", "JZR", "JNZR", "CALLR"):
+            return op_code + encode_register(addr)
         if addr in labels:
             addr = str(labels[addr])
         addr_ternary = encode_address(addr)
@@ -243,7 +249,10 @@ def decode_instruction(machine_code):
     if opcode in ("RET", "HALT"):
         return opcode
 
-    if opcode in ("JMP", "JZ", "JNZ", "CALL"):
+    if opcode in ("JMP", "JZ", "JNZ", "CALL", "JMPR", "JZR", "JNZR", "CALLR"):
+        if opcode in ("JMPR", "JZR", "JNZR", "CALLR"):
+            reg = decode_register(rest[0]) if rest else "?"
+            return f"{opcode} {reg}"
         if rest:
             from trinary.conversion import ternary_to_decimal
             addr = ternary_to_decimal(rest)

@@ -37,7 +37,39 @@ class TALCompiler:
                     self.lines.append(line)
             else:
                 self._handle_instr(line)
+        self._peephole()
         return '\n'.join(self.lines)
+
+    def _peephole(self):
+        """Peephole optimizations on generated assembly."""
+        # 1. Remove redundant consecutive PUSH/POP pairs (push followed by pop of same reg)
+        changed = True
+        while changed:
+            changed = False
+            i = 0
+            while i < len(self.lines) - 1:
+                a = self.lines[i].strip()
+                b = self.lines[i + 1].strip()
+                # PUSH R0 / POP R0 → remove both if no memory access between them
+                if a.startswith('PUSH ') and b.startswith('POP ') and a[5:] == b[4:]:
+                    # Only safe if no instruction between them — they're adjacent
+                    # Check that neither R0 (the pushed reg) was modified by any instruction
+                    # between push/pop that isn't accounted for. Since they're adjacent,
+                    # the pop undoes the push — drop both.
+                    del self.lines[i:i + 2]
+                    changed = True
+                    break
+                # LOAD R0 val / LOAD R0 val2 → keep only the second
+                if a.startswith('LOAD ') and b.startswith('LOAD '):
+                    a_parts = a.split()
+                    b_parts = b.split()
+                    if len(a_parts) >= 2 and len(b_parts) >= 2 and a_parts[1] == b_parts[1]:
+                        del self.lines[i]
+                        changed = True
+                        break
+                i += 1
+
+    # -- instruction generators --
 
     def _clean_line(self, line):
         for m in ('//', '#', ';'):
@@ -195,6 +227,13 @@ class TALCompiler:
         args = self._parse_args(rest, 2)
         var, val = args
         addr = self._mem_addr(var)
+        # Constant folding: if var is a const, fold at compile time
+        if self.symbols.get(var, (None,))[0] == 'const':
+            old_val = self.symbols[var][1]
+            ival = int(val) if val.lstrip('-').isdigit() else 0
+            new_val = old_val + ival
+            self.symbols[var] = ('const', new_val)
+            return
         self._gen_load_mem("R0", var)
         self._gen_load_imm("R1", val)
         self.lines.append("    ADD R0 R1")
@@ -204,6 +243,13 @@ class TALCompiler:
         args = self._parse_args(rest, 2)
         var, val = args
         addr = self._mem_addr(var)
+        # Constant folding: if var is a const, fold at compile time
+        if self.symbols.get(var, (None,))[0] == 'const':
+            old_val = self.symbols[var][1]
+            ival = int(val) if val.lstrip('-').isdigit() else 0
+            new_val = old_val - ival
+            self.symbols[var] = ('const', new_val)
+            return
         self._gen_load_mem("R0", var)
         self._gen_load_imm("R1", val)
         self.lines.append("    SUB R0 R1")
