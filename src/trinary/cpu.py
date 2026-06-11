@@ -50,6 +50,39 @@ from trinary.registers import RegisterFile
 from trinary.alu import alu
 from trinary.memory import Memory
 from trinary.accelerator import TernaryTensorAccelerator
+
+
+def _get_dst_register(opcode, operands):
+    """Return the destination register name for an instruction, or None."""
+    dst_map = {
+        "LOAD": 0, "MOV": 0, "CLR": 0,
+        "ADD": 0, "SUB": 0, "MUL": 0, "DIV": 0,
+        "AND": 0, "OR": 0, "NOT": 0, "CMP": 0,
+        "POP": 0,
+    }
+    idx = dst_map.get(opcode)
+    if idx is not None and idx < len(operands):
+        reg = operands[idx]
+        if reg in RegisterFile.REGISTER_NAMES:
+            return reg
+    return None
+
+
+def _get_read_registers(opcode, operands):
+    """Return list of register names read by an instruction."""
+    if opcode in ("MOV", "ADD", "SUB", "MUL", "DIV", "AND", "OR"):
+        if len(operands) >= 2:
+            return [operands[1]]
+    elif opcode == "CMP":
+        if len(operands) >= 2:
+            return [operands[0], operands[1]]
+    elif opcode == "NOT":
+        if operands:
+            return [operands[0]]
+    elif opcode == "PUSH":
+        if operands:
+            return [operands[0]]
+    return []
 from trinary.hardware import (
     Clock, Pipeline, HazardUnit, StructuralHazardUnit, Cache, BranchPredictor,
     Bus, DMA, InterruptController, Profiler,
@@ -95,7 +128,7 @@ class CPU:
         "TCAS": 3,
     }
 
-    STACK_BASE = 255
+    STACK_BASE = 199
     STACK_MIN = 128
     IVT_SIZE = 8
 
@@ -133,6 +166,9 @@ class CPU:
         self.pipeline = Pipeline()
         self.hazard = HazardUnit()
         self.structural_hazard = StructuralHazardUnit()
+        self._ex_reg_write = None
+        self._mem_reg_write = None
+        self._wb_reg_write = None
         self.icache = Cache(name=f"L1I_C{self.core_id}", size_bytes=256, line_size=8)
         self.dcache = Cache(name=f"L1D_C{self.core_id}", size_bytes=256, line_size=8)
         self.bp = BranchPredictor(mode='two_bit')
@@ -153,7 +189,7 @@ class CPU:
             return_addr: Integer address to return to after interrupt.
         """
         from trinary.conversion import decimal_to_ternary as d2t
-        if self.sp - 5 < self.STACK_MIN:
+        if self.sp - 6 < self.STACK_MIN:
             raise StackOverflowError("Stack overflow")
         for reg in ("R0", "R1", "R2", "R3"):
             self._write_memory(self.sp, self.registers.store(reg))
@@ -186,7 +222,7 @@ class CPU:
         for reg in ("R3", "R2", "R1", "R0"):
             self.sp += 1
             val = self._read_memory(self.sp)
-            self.registers.load(reg, val)
+            self.registers.load(reg, val, force=True)
         return return_addr
 
     def _read_memory(self, addr):
@@ -405,7 +441,7 @@ class CPU:
         elif opcode == "PUSH":
             src = operands[0]
             value = self.registers.store(src)
-            if self.sp < self.STACK_MIN:
+            if self.sp < self.STACK_MIN or self.sp > self.STACK_BASE:
                 raise StackOverflowError("Stack overflow")
             self._write_memory(self.sp, value)
             self.sp -= 1
@@ -420,7 +456,7 @@ class CPU:
 
         elif opcode == "CALL":
             return_addr = self.pc + 1
-            if self.sp < self.STACK_MIN:
+            if self.sp < self.STACK_MIN or self.sp > self.STACK_BASE:
                 raise StackOverflowError("Stack overflow")
             from trinary.conversion import decimal_to_ternary as d2t
             self._write_memory(self.sp, d2t(return_addr))
@@ -431,7 +467,7 @@ class CPU:
 
         elif opcode == "CALLR":
             return_addr = self.pc + 1
-            if self.sp < self.STACK_MIN:
+            if self.sp < self.STACK_MIN or self.sp > self.STACK_BASE:
                 raise StackOverflowError("Stack overflow")
             from trinary.conversion import decimal_to_ternary as d2t, ternary_to_decimal as t2d
             self._write_memory(self.sp, d2t(return_addr))
@@ -649,6 +685,9 @@ class CPU:
             from trinary.accelerator import TritSIMD
             if act_type == 0:
                 result = TritSIMD.ternary_threshold(data)
+            elif act_type == 1:
+                from trinary.ai.activations import ternary_relu, trit_to_signed
+                result = [ternary_relu(trit_to_signed(v)) for v in data]
             else:
                 result = data[:]
             self.accel.memory.store(tid, result)
@@ -749,21 +788,35 @@ class CPU:
         cost = 1
 
         if not self.halted and self.pc < len(self.program):
+            instr_str = self.program[self.pc]
+            parts = instr_str.strip().split()
+            opcode = parts[0].upper() if parts else ""
+            operands = parts[1:] if len(parts) > 1 else []
+
             # Structural hazard: memory port conflict check
             mem_active = self.pipeline.mem_stage is not None and not getattr(self.pipeline.mem_stage, 'bubble', True)
             if_active = not getattr(self.pipeline.if_stage, 'bubble', True)
             if self.structural_hazard.check_mem_port(if_active, mem_active):
-                # IF stalls this cycle — skip fetch
                 cost += 1
                 self.profiler.record_stall('structural')
             else:
-                instr_str = self.program[self.pc]
-                parts = instr_str.strip().split()
-                opcode = parts[0].upper() if parts else ""
-                operands = parts[1:] if len(parts) > 1 else []
                 lat = get_latency(opcode)
-
                 self.pipeline.fetch(instr_str, opcode, operands, cycles=lat)
+
+            # Hazard detection: track destination registers for RAW hazard awareness
+            dst_reg = _get_dst_register(opcode, operands)
+            if dst_reg:
+                read_regs = _get_read_registers(opcode, operands)
+                forward = self.hazard.detect_raw(
+                    self._ex_reg_write, self._mem_reg_write, self._wb_reg_write,
+                    read_regs[0] if len(read_regs) > 0 else None,
+                    read_regs[1] if len(read_regs) > 1 else None,
+                )
+                if forward:
+                    self.profiler.record_raw_forward()
+            self._wb_reg_write = self._mem_reg_write
+            self._mem_reg_write = self._ex_reg_write
+            self._ex_reg_write = dst_reg
 
             if is_branch(opcode):
                 cost += self._execute_branch(instr_str, opcode, operands)

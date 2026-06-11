@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentclass[10pt,a4paper,twoside]{book}
 
-% ── Packages ──────────────────────────────────────────────
+% -- Packages ----------------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsthm}
@@ -28,17 +28,17 @@
 \usepackage{pmboxdraw}
 \usepackage{enumitem}
 
-% ── Modern fonts ──────────────────────────────────────────
+% -- Modern fonts ------------------------------------------
 \usepackage{tgheros}            % TeX Gyre Heros (sans-serif, Google Sans-like)
 \renewcommand{\familydefault}{\sfdefault}  % Sans-serif as body text
 
-% ── Page geometry ─────────────────────────────────────────
+% -- Page geometry -----------------------------------------
 \geometry{margin=0.65in}
 \singlespacing
 \setlength{\parskip}{0pt}
 \setlength{\parindent}{1em}
 
-% ── Compact spacing ───────────────────────────────────────
+% -- Compact spacing ---------------------------------------
 \setlength{\floatsep}{6pt plus 2pt minus 2pt}
 \setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
 \setlength{\intextsep}{6pt plus 2pt minus 2pt}
@@ -51,14 +51,14 @@
 \setlength{\itemsep}{0pt}
 \setlength{\topsep}{0pt}
 
-% ── Compact TOC ───────────────────────────────────────────
+% -- Compact TOC -------------------------------------------
 \setlength{\cftbeforechapskip}{4pt}
 \setlength{\cftbeforesecskip}{2pt}
 \setlength{\cftbeforesubsecskip}{1pt}
 
 
 
-% ── Hyperlinks ────────────────────────────────────────────
+% -- Hyperlinks --------------------------------------------
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
@@ -66,7 +66,7 @@
     urlcolor=blue,
 }
 
-% ── Listings style ────────────────────────────────────────
+% -- Listings style ----------------------------------------
 \definecolor{asmcomment}{rgb}{0.25,0.5,0.25}
 \definecolor{asmopcode}{rgb}{0.0,0.5,0.7}
 \definecolor{asmreg}{rgb}{0.7,0.5,0.0}
@@ -91,7 +91,7 @@
     belowcaptionskip=2pt,
 }
 
-% ── Theorem environments ──────────────────────────────────
+% -- Theorem environments ----------------------------------
 \newtheorem{definition}{Definition}[chapter]
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{lemma}{Lemma}[chapter]
@@ -104,16 +104,16 @@
 
 \begin{document}
 
-% ── Suppress blank pages ───────────────────────────────────
+% -- Suppress blank pages -----------------------------------
 \let\cleardoublepage\clearpage
 
-% ╔══════════════════════════════════════════════════════════╗
-% ║                    FRONT MATTER                         ║
-% ╚══════════════════════════════════════════════════════════╝
+% +==========================================================+
+% |                    FRONT MATTER                         |
+% +==========================================================+
 
 \title{Trinary: A Ternary (Base-3) Computer Simulation\\
        \large Complete Architecture, Implementation, and Analysis}
-\author{Devak R.}
+\author{Devak Chaudhari}
 \date{\today}
 
 \maketitle
@@ -131,7 +131,7 @@ approximately 28,000 lines of Python and C code, validated by a test suite of 59
 tests across all subsystems. A native C backend provides up to 13$\times$ speedup on
 arithmetic-heavy workloads through an auto-detected ctypes bridge. This monograph presents
 the complete architecture, design rationale, implementation details, and performance
-characteristics of the Trinary system across 36 chapters with full instruction-set
+characteristics of the Trinary system across 44 chapters with full instruction-set
 reference, hardware specifications, benchmark data, and appendix reference.
 \end{abstract}
 
@@ -232,7 +232,7 @@ documentation, approximately 28,000 lines of source code, and 594 automated test
 
 \section{Scope of This Monograph}
 
-This work presents the complete Trinary system across 36 chapters organized into eight
+This work presents the complete Trinary system across 44 chapters organized into eight
 parts:
 \begin{itemize}
     \item \textbf{Part I -- Foundations}: Chapters~\ref{ch:intro}--\ref{ch:memory}
@@ -303,26 +303,26 @@ The source package \texttt{src/trinary/} contains the following modules:
 
 \begin{verbatim}
 src/trinary/
-├── conversion.py        Base conversion (ternary/decimal/binary)
-├── logic.py             Ternary logic gates
-├── adder.py             Native base-3 ripple-carry adder
-├── arithmetic.py        Decimal round-trip arithmetic
-├── alu.py               Arithmetic logic unit
-├── registers.py         Register file (R0-R3)
-├── memory.py            Addressable RAM
-├── cpu.py               CPU (27 opcodes, dual stacks, interrupts)
-├── assembler.py         Two-pass assembler
-├── machine.py           Machine-code encoder/decoder
-├── tal.py               TAL structured-language compiler
-├── native_backend.py    C ctypes bridge (auto-detect)
-├── os.py                Legacy TTY OS shell
-├── os/                  Modular SDK OS package
-├── display/             Dual display subsystem
-├── sdk/                 Fantasy Console SDK
-├── accelerator/         Tensor accelerator coprocessor
-├── hardware/            Cycle-accurate hardware simulation
-├── ui/                  PyQt6 desktop visual simulator
-└── ai/                  Ternary neural networks
++-- conversion.py        Base conversion (ternary/decimal/binary)
++-- logic.py             Ternary logic gates
++-- adder.py             Native base-3 ripple-carry adder
++-- arithmetic.py        Decimal round-trip arithmetic
++-- alu.py               Arithmetic logic unit
++-- registers.py         Register file (R0-R3)
++-- memory.py            Addressable RAM
++-- cpu.py               CPU (27 opcodes, dual stacks, interrupts)
++-- assembler.py         Two-pass assembler
++-- machine.py           Machine-code encoder/decoder
++-- tal.py               TAL structured-language compiler
++-- native_backend.py    C ctypes bridge (auto-detect)
++-- os.py                Legacy TTY OS shell
++-- os/                  Modular SDK OS package
++-- display/             Dual display subsystem
++-- sdk/                 Fantasy Console SDK
++-- accelerator/         Tensor accelerator coprocessor
++-- hardware/            Cycle-accurate hardware simulation
++-- ui/                  PyQt6 desktop visual simulator
++-- ai/                  Ternary neural networks
 \end{verbatim}
 
 \section{Complete System Stack}
@@ -330,30 +330,30 @@ src/trinary/
 The full system stack, from hardware primitives to application software:
 
 \begin{verbatim}
-┌──────────────────────────────────────────────────────────────┐
-│  APPLICATION LAYER                                           │
-│  (OS Shell, Demo Programs, User Code, Fantasy Console Games) │
-├──────────────────────────────┬───────────────────────────────┤
-│  TAL COMPILER                │  FANTASY CONSOLE SDK          │
-│  (structured lang→assembly)  │  (Engine, Runtime, Cartridge) │
-├──────────────────────────────┴───────────────────────────────┤
-│  ASSEMBLER                                                   │
-│  (two-pass: labels→addresses, branch resolution)              │
-├──────────────────────────────────────────────────────────────┤
-│  MACHINE CODE ENCODER / DECODER                              │
-│  (assembly <-> ternary opcode strings, 27 opcodes)              │
-├──────────────────────────────────────────────────────────────┤
-│  CPU                                                         │
-│  (fetch-decode-execute, 27 opcodes, 4 regs, 512/10000B RAM) │
-├──────────────────────┬───────────────────────────────────────┤
-│  ACCELERATOR COPROC  │  HARDWARE SIMULATION                  │
-│  (TensorMemory, SIMD,│  (Pipeline, Cache, Branch Pred,      │
-│   TensorCore, GPU)   │   DMA, Bus, Interrupts, VRAM, Prof)  │
-├──────────────────────┴───────────────────────────────────────┤
-│  ALU │ REGISTERS │ MEMORY │ DISPLAY │ ARITHMETIC             │
-├──────────────────────────────────────────────────────────────┤
-│  conversion.py │ logic.py │ adder.py │ native C backend      │
-└──────────────────────────────────────────────────────────────┘
++--------------------------------------------------------------+
+|  APPLICATION LAYER                                           |
+|  (OS Shell, Demo Programs, User Code, Fantasy Console Games) |
++------------------------------+-------------------------------|
+|  TAL COMPILER                |  FANTASY CONSOLE SDK          |
+|  (structured lang→assembly)  |  (Engine, Runtime, Cartridge) |
++------------------------------+-------------------------------|
+|  ASSEMBLER                                                   |
+|  (two-pass: labels→addresses, branch resolution)              |
++--------------------------------------------------------------|
+|  MACHINE CODE ENCODER / DECODER                              |
+|  (assembly <-> ternary opcode strings, 27 opcodes)              |
++--------------------------------------------------------------|
+|  CPU                                                         |
+|  (fetch-decode-execute, 27 opcodes, 4 regs, 512/10000B RAM) |
++----------------------+---------------------------------------|
+|  ACCELERATOR COPROC  |  HARDWARE SIMULATION                  |
+|  (TensorMemory, SIMD,|  (Pipeline, Cache, Branch Pred,      |
+|   TensorCore, GPU)   |   DMA, Bus, Interrupts, VRAM, Prof)  |
++----------------------+---------------------------------------|
+|  ALU | REGISTERS | MEMORY | DISPLAY | ARITHMETIC             |
++--------------------------------------------------------------|
+|  conversion.py | logic.py | adder.py | native C backend      |
++--------------------------------------------------------------+
 \end{verbatim}
 
 \section{Memory Maps}
@@ -2285,14 +2285,14 @@ The refactored display package followed four design goals:
 
 \begin{verbatim}
 display/
-├── __init__.py          # Exports: DisplayMemoryMap, PixelDisplay, Framebuffer
-├── constants.py         # VRAM addresses, display dimensions (VRAM_BASE, WIDTH, HEIGHT)
-├── palette.py           # 9-color palette (RGB tuples, color names)
-├── text_display.py      # DisplayMemoryMap (7×8 char grid), PixelDisplay (27×27)
-├── framebuffer.py       # 64×64 framebuffer with dirty-rect tracking
-├── keyboard.py          # Memory-mapped keyboard I/O (legacy + SDK)
-├── display_controller.py # Bridges CPU memory <-> framebuffer via write hooks
-└── display_widget.py    # PyQt6 rendering widget (retro aesthetic, 8× scale)
++-- __init__.py          # Exports: DisplayMemoryMap, PixelDisplay, Framebuffer
++-- constants.py         # VRAM addresses, display dimensions (VRAM_BASE, WIDTH, HEIGHT)
++-- palette.py           # 9-color palette (RGB tuples, color names)
++-- text_display.py      # DisplayMemoryMap (7×8 char grid), PixelDisplay (27×27)
++-- framebuffer.py       # 64×64 framebuffer with dirty-rect tracking
++-- keyboard.py          # Memory-mapped keyboard I/O (legacy + SDK)
++-- display_controller.py # Bridges CPU memory <-> framebuffer via write hooks
++-- display_widget.py    # PyQt6 rendering widget (retro aesthetic, 8× scale)
 \end{verbatim}
 
 \begin{figure}[H]
@@ -2348,14 +2348,14 @@ game loop:
 
 \begin{verbatim}
 Runtime.run(update_fn, render_fn)
-    ├─ engine.init()              # One-time setup
-    ├─ Fixed-timestep loop (30 FPS)
-    │   ├─ poll_input()           # Read keyboard registers
-    │   ├─ update_fn()            # Game logic
-    │   ├─ engine.update()        # Animation ticks
-    │   ├─ render_fn()            # Draw calls
-    │   └─ engine.render()        # Post-processing
-    └─ engine.shutdown()          # Cleanup
+    +-- engine.init()              # One-time setup
+    +-- Fixed-timestep loop (30 FPS)
+    |   +-- poll_input()           # Read keyboard registers
+    |   +-- update_fn()            # Game logic
+    |   +-- engine.update()        # Animation ticks
+    |   +-- render_fn()            # Draw calls
+    |   +- engine.render()        # Post-processing
+    +- engine.shutdown()          # Cleanup
 \end{verbatim}
 
 \section{Components}
@@ -2454,10 +2454,10 @@ CPU, providing hardware-accelerated vector and matrix operations.
 
 \begin{verbatim}
 TernaryTensorAccelerator
-├── TensorMemory (64 slots, variable-shape tensors)
-├── SIMDProcessor (4+ lanes, element-wise ops)
-├── TensorCore (matrix multiply engine)
-└── Cycles / stats tracking
++-- TensorMemory (64 slots, variable-shape tensors)
++-- SIMDProcessor (4+ lanes, element-wise ops)
++-- TensorCore (matrix multiply engine)
++-- Cycles / stats tracking
 \end{verbatim}
 
 \section{Tensor ISA}

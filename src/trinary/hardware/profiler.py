@@ -23,6 +23,7 @@ class Profiler:
         self.stalls_data = 0
         self.stalls_control = 0
         self.stalls_structural = 0
+        self.raw_forwards = 0
         self.cache_hits = 0
         self.cache_misses = 0
         self.branch_predictions = 0
@@ -69,6 +70,9 @@ class Profiler:
         self.dma_bytes += bytes_moved
         if transfer_complete:
             self.dma_transfers += 1
+
+    def record_raw_forward(self):
+        self.raw_forwards += 1
 
     def record_vram(self, write=True, stalled=False):
         if write:

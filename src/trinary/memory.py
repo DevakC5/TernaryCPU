@@ -7,6 +7,9 @@ Stores ternary values at integer addresses.
 
 
 
+IVT_RANGE = range(0, 8)  # Interrupt Vector Table occupies addresses 0-7
+
+
 class Memory:
     """Ternary RAM - addressable memory for CPU."""
 
@@ -63,6 +66,9 @@ class Memory:
             memory.store(100, "102")  # Store "102" at address 100
         """
         self.validate_address(address)
+        if address in IVT_RANGE:
+            import warnings
+            warnings.warn(f"Write to IVT address {address}", RuntimeWarning, stacklevel=2)
         self.validate_value(value)
         self.data[address] = value
         for hstart, hend, hook in self._write_hooks:

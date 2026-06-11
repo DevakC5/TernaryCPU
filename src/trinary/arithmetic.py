@@ -208,7 +208,7 @@ def multiply_ternary(a, b):
 
 
 def divide_ternary(a, b):
-    """Divide a by b using native signed-magnitude arithmetic (floor division)."""
+    """Divide a by b using native signed-magnitude arithmetic (truncated division toward zero)."""
     a_neg = _is_negative(a)
     b_neg = _is_negative(b)
     a_mag = _strip_leading_zeros(_magnitude(a)) or "0"

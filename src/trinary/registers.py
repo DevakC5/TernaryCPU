@@ -32,12 +32,13 @@ class RegisterFile:
                 raise ValueError(f"Invalid trit: {c}. Must be 0, 1, or 2")
         return True
 
-    def load(self, register, value):
+    def load(self, register, value, force=False):
         """LOAD - Load a ternary value into a register.
 
         Args:
             register (str): Register name (R0, R1, R2, R3)
             value (str): Ternary value to store
+            force (bool): If True, bypass R3 read-only guard (for context restore).
 
         Returns:
             str: The loaded value
@@ -46,6 +47,9 @@ class RegisterFile:
             load("R0", "102") -> "102"
         """
         self.validate_register(register)
+        if register == "R3" and not force and value != "0":
+            import warnings
+            warnings.warn("R3 is read-only by convention", RuntimeWarning, stacklevel=2)
         self.validate_value(value)
         self.registers[register] = value
         return value
@@ -80,6 +84,9 @@ class RegisterFile:
         """
         self.validate_register(src)
         self.validate_register(dst)
+        if dst == "R3" and src != "R3":
+            import warnings
+            warnings.warn("R3 is read-only by convention", RuntimeWarning, stacklevel=2)
         value = self.registers[src]
         self.registers[dst] = value
         return value
