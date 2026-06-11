@@ -1457,7 +1457,7 @@ TMATMUL & 20 & Tensor matrix multiply \\
 The full opcode map assigns a 3-trit ternary opcode to each instruction:
 
 \begin{longtable}{cllllc}
-\caption{Complete opcode map (31 opcodes)\footnote{The Decimal column is a dispatch identifier, not a ternary-to-decimal conversion of the Ternary opcode field. Non-tensor opcodes use IDs 0--24 matching their ternary value; tensor opcodes (ternary 210--222) use IDs 28--33 to avoid dispatch collision.}}
+\caption{Complete opcode map (31 opcodes). The Dispatch ID is a sequential identifier, not a ternary-to-decimal conversion of the opcode field.}
 \label{tab:opcodelong} \\
 \toprule
 Ternary & Dispatch ID & Mnemonic & Format & Cycles & Description \\
