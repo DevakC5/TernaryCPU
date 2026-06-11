@@ -41,6 +41,7 @@ class Assembler:
         "STOREM", "LOADM",
         "INT", "IRET", "EI", "DI", "SETIVT", "SETTIMER",
         "TLOADW", "TSTOREW", "TVECADD", "TMATMUL", "TDOT", "TACT",
+        "TCAS",
     }
 
     BRANCH_OPCODES = {"JMP", "JZ", "JNZ", "CALL"}

@@ -1,0 +1,26 @@
+\contentsline {chapter}{\numberline {1}Introduction to Ternary Computing}{5}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Binary vs.\ Ternary Number Systems}{5}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Historical Context: The Setun Computer}{6}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Why Simulate a Ternary Computer in Software?}{6}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Scope of This Book}{7}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Verifying Your Environment}{7}{section.1.5}%
+\contentsline {chapter}{\numberline {2}System Architecture Overview}{9}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Five-Layer Abstraction Stack}{9}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Module Dependency Graph}{10}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}Memory Map}{10}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Number Representation}{11}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Dual-Stack Design}{11}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Memory Stack (PUSH / POP)}{12}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Call Stack (CALL / RET)}{12}{subsection.2.4.2}%
+\contentsline {section}{\numberline {2.5}Instruction Set Summary}{12}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Directory Structure}{12}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Exploring the Public API}{14}{section.2.7}%
+\contentsline {chapter}{\numberline {3}Environment Setup and Quick Start}{15}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Prerequisites}{15}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Package Installation}{15}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Running the Test Suite}{16}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Booting the Interactive OS Shell}{16}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Launching the PyQt6 Desktop UI}{17}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Running Demo Programs}{17}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Viewing ASCII Architecture Diagrams}{18}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Your First ``Hello, Ternary'' Program}{18}{section.3.8}%

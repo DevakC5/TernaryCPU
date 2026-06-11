@@ -1,4 +1,4 @@
-"""Interrupt controller with priorities, masking, and IVT."""
+"""Interrupt controller with priorities, masking, IVT, and IPI support."""
 
 
 class InterruptController:
@@ -9,6 +9,7 @@ class InterruptController:
     - Priority ordering (0 = highest)
     - Global and per-IRQ masking
     - Nesting support
+    - Inter-Processor Interrupts (IPI) — send irq to another core
     """
 
     def __init__(self, num_lines=8):
@@ -21,8 +22,22 @@ class InterruptController:
         self._nested_depth = 0
 
     def request(self, irq_num):
+        """Request an interrupt on this controller.
+
+        Args:
+            irq_num: Interrupt request line number (0 to num_lines-1).
+        """
         if 0 <= irq_num < self.num_lines and not self._masked[irq_num]:
             self._pending[irq_num] = True
+
+    def send_ipi(self, target_controller, irq_num):
+        """Inter-Processor Interrupt: trigger an IRQ on another core.
+
+        Args:
+            target_controller: InterruptController instance of the target core.
+            irq_num: Interrupt line to trigger on the target.
+        """
+        target_controller.request(irq_num)
 
     def acknowledge(self):
         if self.global_mask or self._in_isr:

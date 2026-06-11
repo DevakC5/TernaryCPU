@@ -9,7 +9,10 @@ Set USE_NATIVE = False to force pure Python mode.
 
 import warnings
 
-from trinary.arithmetic import add_ternary, subtract_ternary, multiply_ternary, divide_ternary
+from trinary.arithmetic import (
+    add_ternary, subtract_ternary, multiply_ternary, divide_ternary,
+    _compare_magnitude,
+)
 from trinary.logic import tnot, tand, tor, validate_trit
 from trinary.conversion import ternary_to_decimal, decimal_to_ternary
 
@@ -149,14 +152,20 @@ def alu(operation, a, b=None):
         return (result, None)
 
     if operation == "CMP":
-        dec_a = ternary_to_decimal(a) if a else 0
-        dec_b = ternary_to_decimal(b) if b else 0
-        if dec_a == dec_b:
+        if a == b:
             return ("EQ", None)
-        elif dec_a < dec_b:
+        cmp_val = _compare_magnitude(a, b)
+        if cmp_val == 0:
+            return ("EQ", None)
+        a_neg = a.startswith("-")
+        b_neg = b.startswith("-")
+        if a_neg and not b_neg:
             return ("LT", None)
-        else:
+        if not a_neg and b_neg:
             return ("GT", None)
+        if a_neg and b_neg:
+            return ("GT", None) if cmp_val < 0 else ("LT", None)
+        return ("GT", None) if cmp_val > 0 else ("LT", None)
 
     raise ValueError(f"Unknown operation: {operation}")
 

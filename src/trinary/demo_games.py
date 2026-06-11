@@ -4,6 +4,7 @@ from trinary.sdk.api import (
     make_sprite_from_strings, poll_input,
 )
 from trinary.memory import Memory
+from trinary.demo_automaton import demo_automaton, _automaton_update, _automaton_render
 
 
 def _pong_update(state):
@@ -290,6 +291,7 @@ DEMOS = {
     "bouncing_logo": (demo_bouncing_logo, _bouncing_logo_update, _bouncing_logo_render),
     "tilemap_scroller": (demo_tilemap_scroller, _tilemap_scroller_update, _tilemap_scroller_render),
     "rpg_movement": (demo_rpg_movement, _rpg_movement_update, _rpg_movement_render),
+    "automaton": (demo_automaton, _automaton_update, _automaton_render),
 }
 
 _GAME_TITLES = {

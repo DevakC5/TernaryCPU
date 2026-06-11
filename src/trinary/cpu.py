@@ -75,6 +75,7 @@ class CPU:
         "STOREM", "LOADM",
         "INT", "IRET", "EI", "DI", "SETIVT", "SETTIMER",
         "TLOADW", "TSTOREW", "TVECADD", "TMATMUL", "TDOT", "TACT",
+        "TCAS",
     }
 
     CYCLES = {
@@ -87,22 +88,23 @@ class CPU:
         "CALL": 3, "RET": 3,
         "HALT": 1,
         "STOREM": 2, "LOADM": 2,
-        "INT": 3, "IRET": 3,
+        "INT": 8, "IRET": 8,
         "EI": 1, "DI": 1,
         "SETIVT": 2, "SETTIMER": 1,
         "TLOADW": 10, "TSTOREW": 10, "TVECADD": 4, "TMATMUL": 20, "TDOT": 6, "TACT": 3,
+        "TCAS": 3,
     }
 
     STACK_BASE = 255
     STACK_MIN = 128
     IVT_SIZE = 8
 
-    def __init__(self, memory=None, realistic_timing=False):
+    def __init__(self, memory=None, realistic_timing=False, core_id=0,
+                 shared_bus=None, shared_clock=None, shared_dma=None):
         self.registers = RegisterFile()
         self.memory = memory if memory else Memory(512)
-        self.sp = self.STACK_BASE  # Stack pointer for PUSH/POP
+        self.sp = self.STACK_BASE  # Stack pointer for PUSH/POP/CALL/RET
         self.pc = 0
-        self.call_stack = []  # Separate stack for CALL/RET addresses
         self.flags = {
             "ZERO": False,
             "EQUAL": False,
@@ -119,26 +121,123 @@ class CPU:
         self.pending_interrupt = None  # Interrupt number pending, or None
         self.accel = TernaryTensorAccelerator()
         self.realistic_timing = realistic_timing
+        self.core_id = core_id
+        self._shared_bus = shared_bus
+        self._shared_clock = shared_clock
+        self._shared_dma = shared_dma
         if realistic_timing:
             self._init_hardware()
 
     def _init_hardware(self):
-        self.clock = Clock()
+        self.clock = self._shared_clock if self._shared_clock else Clock()
         self.pipeline = Pipeline()
         self.hazard = HazardUnit()
-        self.icache = Cache(name="L1I", size_bytes=256, line_size=8)
-        self.dcache = Cache(name="L1D", size_bytes=256, line_size=8)
+        self.icache = Cache(name=f"L1I_C{self.core_id}", size_bytes=256, line_size=8)
+        self.dcache = Cache(name=f"L1D_C{self.core_id}", size_bytes=256, line_size=8)
         self.bp = BranchPredictor(mode='two_bit')
-        self.bus = Bus()
-        self.dma = DMA(bus=self.bus)
+        self.bus = self._shared_bus if self._shared_bus else Bus()
+        self.dma = self._shared_dma if self._shared_dma else DMA(bus=self.bus)
         self.intc = InterruptController()
         self.profiler = Profiler()
+        if self._shared_bus is not None:
+            self.bus.register_snooper(self.dcache)
+
+    def _push_context(self, return_addr):
+        """Save interrupt context to the hardware stack.
+
+        Pushes R0-R3, condition flags (encoded as a 3-trit string ZGE),
+        and return address. Grows stack downward from STACK_BASE.
+
+        Args:
+            return_addr: Integer address to return to after interrupt.
+        """
+        from trinary.conversion import decimal_to_ternary as d2t
+        if self.sp - 5 < self.STACK_MIN:
+            raise StackOverflowError("Stack overflow")
+        for reg in ("R0", "R1", "R2", "R3"):
+            self._write_memory(self.sp, self.registers.store(reg))
+            self.sp -= 1
+        flags_str = (
+            ("2" if self.flags["ZERO"] else "0") +
+            ("2" if self.flags["GREATER"] else "0") +
+            ("2" if self.flags["LESS"] else "0")
+        )
+        self._write_memory(self.sp, flags_str)
+        self.sp -= 1
+        self._write_memory(self.sp, d2t(return_addr))
+        self.sp -= 1
+
+    def _pop_context(self):
+        """Restore interrupt context from the hardware stack.
+
+        Returns:
+            int: The return address (PC to resume).
+        """
+        from trinary.conversion import ternary_to_decimal as t2d
+        self.sp += 1
+        return_addr = t2d(self._read_memory(self.sp))
+        self.sp += 1
+        flags_str = self._read_memory(self.sp)
+        self.flags["ZERO"] = len(flags_str) > 0 and flags_str[0] == "2"
+        self.flags["GREATER"] = len(flags_str) > 1 and flags_str[1] == "2"
+        self.flags["LESS"] = len(flags_str) > 2 and flags_str[2] == "2"
+        self.flags["EQUAL"] = self.flags["ZERO"]
+        for reg in ("R3", "R2", "R1", "R0"):
+            self.sp += 1
+            val = self._read_memory(self.sp)
+            self.registers.load(reg, val)
+        return return_addr
+
+    def _read_memory(self, addr):
+        """Read from memory, routing through L1 data cache when in realistic timing mode.
+
+        On cache miss: reads from main memory and fills the cache line.
+        On cache hit: returns the cached value directly.
+
+        Args:
+            addr: Integer memory address.
+
+        Returns:
+            str: Ternary value at that address.
+        """
+        if hasattr(self, 'dcache') and self.realistic_timing:
+            cached, _ = self.dcache.read(addr)
+            if cached is not None:
+                offset = addr % self.dcache.line_size
+                val = cached.get(str(offset), "0")
+                self.profiler.record_cache(hit=True)
+                return val
+            self.profiler.record_cache(hit=False)
+            val = self.memory.load(addr)
+            offset = addr % self.dcache.line_size
+            self.dcache.write(addr, {str(offset): val})
+            self.profiler.record_cache(hit=False)
+            return val
+        return self.memory.load(addr)
+
+    def _write_memory(self, addr, value):
+        """Write to memory, routing through L1 data cache when in realistic timing mode.
+
+        Write-through policy: updates both cache and main memory immediately.
+        On write, broadcasts a bus snoop notification so other cores can
+        invalidate stale cache lines (write-invalidate coherency protocol).
+
+        Args:
+            addr: Integer memory address.
+            value: Ternary string to write.
+        """
+        if hasattr(self, 'dcache') and self.realistic_timing:
+            offset = addr % self.dcache.line_size
+            hit_cycles = self.dcache.write(addr, {str(offset): value})
+            if hasattr(self, 'bus') and hasattr(self.bus, 'notify_write'):
+                self.bus.notify_write(addr)
+            self.profiler.record_cache(hit=(hit_cycles == self.dcache.hit_cycles))
+        self.memory.store(addr, value)
 
     def reset(self):
         """Reset CPU state."""
         self.registers = RegisterFile()
         self.sp = self.STACK_BASE
-        self.call_stack = []
         self.pc = 0
         self.flags = {"ZERO": False, "EQUAL": False, "GREATER": False, "LESS": False}
         self.halted = False
@@ -149,6 +248,8 @@ class CPU:
         self.timer_counter = 0
         self.pending_interrupt = None
         self.accel = TernaryTensorAccelerator()
+        core_id = getattr(self, 'core_id', 0)
+        self.core_id = core_id
         if hasattr(self, 'realistic_timing') and self.realistic_timing:
             self._init_hardware()
 
@@ -285,7 +386,7 @@ class CPU:
             value = self.registers.store(src)
             if self.sp < self.STACK_MIN:
                 raise StackOverflowError("Stack overflow")
-            self.memory.store(self.sp, value)
+            self._write_memory(self.sp, value)
             self.sp -= 1
 
         elif opcode == "POP":
@@ -293,20 +394,26 @@ class CPU:
             if self.sp >= self.STACK_BASE:
                 raise StackUnderflowError("Stack underflow")
             self.sp += 1
-            value = self.memory.load(self.sp)
+            value = self._read_memory(self.sp)
             self.registers.load(dst, value)
 
         elif opcode == "CALL":
             return_addr = self.pc + 1
-            self.call_stack.append(return_addr)
+            if self.sp < self.STACK_MIN:
+                raise StackOverflowError("Stack overflow")
+            from trinary.conversion import decimal_to_ternary as d2t
+            self._write_memory(self.sp, d2t(return_addr))
+            self.sp -= 1
             addr = int(operands[0])
             self.pc = addr
             return
 
         elif opcode == "RET":
-            if not self.call_stack:
+            if self.sp >= self.STACK_BASE:
                 raise StackUnderflowError("Stack underflow")
-            return_addr = self.call_stack.pop()
+            self.sp += 1
+            from trinary.conversion import ternary_to_decimal as t2d
+            return_addr = t2d(self._read_memory(self.sp))
             self.pc = return_addr
             return
 
@@ -322,7 +429,7 @@ class CPU:
             else:
                 addr = int(addr_op)
             value = self.registers.store(src)
-            self.memory.store(addr, value)
+            self._write_memory(addr, value)
 
         elif opcode == "LOADM":
             addr_op, dst = operands
@@ -331,19 +438,14 @@ class CPU:
                 addr = t2d(self.registers.store(addr_op))
             else:
                 addr = int(addr_op)
-            value = self.memory.load(addr)
+            value = self._read_memory(addr)
             self.registers.load(dst, value)
 
         elif opcode == "INT":
             int_num = int(operands[0])
             if int_num < 0 or int_num >= len(self.ivt):
                 raise ValueError(f"Invalid interrupt number: {int_num}")
-            return_addr = self.pc + 1
-            if self.sp < self.STACK_MIN:
-                raise StackOverflowError("Stack overflow")
-            from trinary.conversion import decimal_to_ternary as d2t
-            self.memory.store(self.sp, d2t(return_addr))
-            self.sp -= 1
+            self._push_context(self.pc + 1)
             self.iflag = False
             self.pc = self.ivt[int_num]
             return
@@ -351,9 +453,7 @@ class CPU:
         elif opcode == "IRET":
             if self.sp >= self.STACK_BASE:
                 raise StackUnderflowError("Stack underflow")
-            self.sp += 1
-            from trinary.conversion import ternary_to_decimal as t2d
-            return_addr = t2d(self.memory.load(self.sp))
+            return_addr = self._pop_context()
             self.pc = return_addr
             self.iflag = True
             return
@@ -408,7 +508,7 @@ class CPU:
                 cols = int(cols_op)
             data = []
             for i in range(rows * cols):
-                val = self.memory.load(addr + i).lstrip("-")
+                val = self._read_memory(addr + i).lstrip("-")
                 data.append(int(val) if val.isdigit() else 1)
             tid = self.accel.memory.allocate(data, shape=(rows, cols))
             from trinary.conversion import decimal_to_ternary as d2t
@@ -428,7 +528,7 @@ class CPU:
                 addr = int(addr_op)
             data = self.accel.memory.load_list(tid)
             for i, v in enumerate(data):
-                self.memory.store(addr + i, str(v))
+                self._write_memory(addr + i, str(v))
 
         elif opcode == "TVECADD":
             dst_op, src_a_op, src_b_op = operands
@@ -521,6 +621,29 @@ class CPU:
                 result = data[:]
             self.accel.memory.store(tid, result)
 
+        elif opcode == "TCAS":
+            addr_op, expected_op, new_op = operands
+            from trinary.conversion import ternary_to_decimal as t2d
+            from trinary.conversion import decimal_to_ternary as d2t
+            if addr_op in self.registers.REGISTER_NAMES:
+                addr = int(t2d(self.registers.store(addr_op)))
+            else:
+                addr = int(addr_op)
+            if expected_op in self.registers.REGISTER_NAMES:
+                expected = self.registers.store(expected_op)
+            else:
+                expected = expected_op
+            if new_op in self.registers.REGISTER_NAMES:
+                new_val = self.registers.store(new_op)
+            else:
+                new_val = new_op
+            current = self._read_memory(addr)
+            if current == expected:
+                self._write_memory(addr, new_val)
+                self.registers.load("R0", d2t(2))
+            else:
+                self.registers.load("R0", d2t(0))
+
         self.pc += 1
 
     def step(self):
@@ -560,11 +683,7 @@ class CPU:
                 handler_addr = self.ivt[int_num]
                 if handler_addr is not None and handler_addr >= 0:
                     return_addr = self.pc
-                    if self.sp < self.STACK_MIN:
-                        raise StackOverflowError("Stack overflow")
-                    from trinary.conversion import decimal_to_ternary as d2t
-                    self.memory.store(self.sp, d2t(return_addr))
-                    self.sp -= 1
+                    self._push_context(return_addr)
                     self.iflag = False
                     self.pc = handler_addr
                     self.halted = False
@@ -581,12 +700,18 @@ class CPU:
         Pipeline stages are simulated for visualization.
         DMA runs concurrently on every cycle.
 
+        When part of a MultiCoreSystem (shared_* kwargs passed), the
+        system clock, bus, and DMA are ticked by the system wrapper
+        and must not be ticked per-core.
+
         Returns:
             int: Cycles consumed by this step.
         """
-        self.clock.tick()
+        if self._shared_clock is None:
+            self.clock.tick()
         self.profiler.record_cycle()
-        self.dma.tick(memory=self.memory)
+        if self._shared_dma is None:
+            self.dma.tick(memory=self.memory)
         self.pipeline.advance()
 
         cost = 1
@@ -615,8 +740,10 @@ class CPU:
 
         irq = self.intc.acknowledge()
         if irq is not None and irq < len(self.ivt):
+            self._push_context(self.pc)
             self.pipeline.flush()
             self.pc = self.ivt[irq]
+            self.iflag = False
             self.halted = False
             cost += 2
 
@@ -686,7 +813,7 @@ class CPU:
             print(f"\n--- HALTED at PC={self.pc} ---")
             print(f"Registers: {self.registers.dump()}")
             print(f"Stack Pointer: SP={self.sp}")
-            print(f"Call Stack: {self.call_stack}")
+            print(f"Call Stack: {[self._read_memory(a) for a in range(self.sp + 1, self.STACK_BASE + 1)]}")
             print(f"Flags: {self.flags}")
             print(f"Cycles: {total_cycles} | Instructions: {step_num} | IPC: {ipc:.3f}")
 

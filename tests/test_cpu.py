@@ -114,7 +114,7 @@ class TestCPU:
         assert cpu.timer_counter > 0
 
     def test_int_and_iret(self):
-        """INT pushes PC, jumps to handler; IRET pops PC."""
+        """INT pushes context, jumps to handler; IRET restores context."""
         cpu = CPU()
         cpu.load_program([
             "SETIVT 0 3",
@@ -124,7 +124,7 @@ class TestCPU:
             "IRET",
         ])
         cpu.run(verbose=False)
-        assert cpu.registers.store("R0") == "1"
+        assert cpu.registers.store("R0") == "0"
 
     def test_int_disables_interrupts(self):
         """INT clears iflag so nested interrupts are blocked until EI."""
@@ -140,7 +140,7 @@ class TestCPU:
             "IRET",
         ])
         cpu.run(verbose=False)
-        assert cpu.registers.store("R0") == "1"
+        assert cpu.registers.store("R0") == "0"
 
     def test_interrupt_via_step(self):
         """Single interrupt: EI → trigger → HALT → handler → IRET → HALT."""
@@ -203,7 +203,7 @@ class TestCPU:
         cpu.step()  # 6: HALT
         assert cpu.halted
         assert cpu.registers.store("R2") == "1"
-        assert cpu.registers.store("R0") == "1"
+        assert cpu.registers.store("R0") == "0"
 
     def test_nested_interrupt_soft_via_int(self):
         """Nested interrupts via INT: int0 handler calls int1."""

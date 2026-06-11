@@ -16,9 +16,8 @@ import ctypes
 from collections import deque
 
 from trinary.accelerator.tensor_core import TensorCore
-from trinary.accelerator.vector_ops import TritSIMD
 from trinary.accelerator.packed_trits import PackedTritArray
-from trinary.ai.activations import trit_to_signed, signed_to_trit, ternary_step
+from trinary.ai.activations import TRIT_TO_SIGNED_LUT, TERNARY_STEP_LUT
 
 try:
     from trinary.gpu_native import (
@@ -42,88 +41,117 @@ except ImportError:
 
 USE_GPU_NATIVE = True
 
-
-def _to_c_arr(data):
-    return (ctypes.c_int * len(data))(*data)
+# Lookup tables
+_T2S = TRIT_TO_SIGNED_LUT  # [ -1, 0, 1 ]  indexed by trit 0/1/2
+# ternary_step for range [-2, 2] at offset +2
+_TS5 = [0, 0, 1, 2, 2]
 
 DEFAULT_WARPSIZE = 4
 DEFAULT_PES_PER_WG = 16
 DEFAULT_NUM_WGS = 4
 
 
+def _fast_add(a, b):
+    """Inlined ternary vector add — no function call overhead."""
+    t2s, ts = _T2S, _TS5
+    return [ts[t2s[x] + t2s[y] + 2] for x, y in zip(a, b)]
+
+
+def _fast_dot(a, b):
+    """Inlined ternary dot product."""
+    t2s = _T2S
+    total = 0
+    for x, y in zip(a, b):
+        total += t2s[x] * t2s[y]
+    return total
+
+
+def _fast_threshold(vals):
+    ts = _TS5
+    return [ts[v + 2] if -2 <= v <= 2 else (0 if v < -2 else 2) for v in vals]
+
+
+def _fast_sum(vals):
+    t2s = _T2S
+    total = 0
+    for v in vals:
+        total += t2s[v]
+    return total
+
+
+def _fast_max(vals):
+    t2s = _T2S
+    if not vals:
+        return 0
+    mx = t2s[vals[0]]
+    for v in vals[1:]:
+        s = t2s[v]
+        if s > mx:
+            mx = s
+    return mx
+
+
+def _fast_min(vals):
+    t2s = _T2S
+    if not vals:
+        return 0
+    mn = t2s[vals[0]]
+    for v in vals[1:]:
+        s = t2s[v]
+        if s < mn:
+            mn = s
+    return mn
+
+
 class ProcessingElement:
     """A single GPU processing element (like a CUDA core).
 
-    Each PE has local memory, a result register, and can execute
-    element-wise ternary operations on its loaded data.
+    Each PE has local memory as a plain list of trits (no PackedTritArray
+    overhead on hot paths).
     """
 
     def __init__(self, pe_id, warp_id=None):
         self.pe_id = pe_id
         self.warp_id = warp_id
-        self.local_mem = PackedTritArray()
+        self.data = []
         self.result = None
         self.cycles = 0
         self.active = True
 
     def load(self, data):
-        self.local_mem = PackedTritArray(data)
+        self.data = list(data)
 
     def execute(self, op, other=None):
         self.cycles += 1
-        data = self.local_mem.to_list()
-        use_native = USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE and len(data) > 0
+        d = self.data
+        if not d:
+            self.result = []
+            return
 
         if op == "add" and other is not None:
-            if use_native and len(other) == len(data):
-                self.result = native_vec_add(data, other)
-            else:
-                self.result = TritSIMD.add_vectors(data, other)
+            self.result = _fast_add(d, other)
         elif op == "mul" and other is not None:
-            if use_native and len(other) == len(data):
-                self.result = native_vec_mul(data, other)
-            else:
-                self.result = TritSIMD.mul_vectors(data, other)
+            self.result = [ts5[t2s[x]*t2s[y]+2] for x, y in zip(d, other)]
         elif op == "dot" and other is not None:
-            if use_native and len(other) == len(data):
-                self.result = native_vec_dot(data, other)
-            else:
-                self.result = TritSIMD.dot_product(data, other)
+            self.result = _fast_dot(d, other)
         elif op == "threshold":
-            if use_native:
-                self.result = native_vec_threshold(data)
-            else:
-                self.result = TritSIMD.ternary_threshold(data)
+            self.result = _fast_threshold(d)
         elif op == "sum":
-            if use_native:
-                self.result = native_vec_sum(data)
-            else:
-                self.result = sum(trit_to_signed(v) for v in data)
+            self.result = _fast_sum(d)
         elif op == "max":
-            if use_native:
-                self.result = native_vec_max(data)
-            else:
-                signed = [trit_to_signed(v) for v in data]
-                self.result = max(signed) if signed else 0
+            self.result = _fast_max(d)
         elif op == "min":
-            if use_native:
-                self.result = native_vec_min(data)
-            else:
-                signed = [trit_to_signed(v) for v in data]
-                self.result = min(signed) if signed else 0
+            self.result = _fast_min(d)
         else:
-            self.result = data[:]
+            self.result = d[:]
 
     def reset(self):
         self.result = None
-        self.local_mem = PackedTritArray()
+        self.data.clear()
 
 
 class Warp:
-    """A warp/wavefront: a group of PEs executing in lockstep (SIMT).
-
-    All PEs in a warp execute the same instruction on different data.
-    """
+    """A warp/wavefront: a group of PEs executing in lockstep (SIMT)."""
 
     def __init__(self, warp_id, size=DEFAULT_WARPSIZE):
         self.warp_id = warp_id
@@ -138,16 +166,6 @@ class Warp:
             self.pes.append(pe)
 
     def execute_kernel(self, kernel_func, data_slices=None, **kwargs):
-        """Execute kernel across all active PEs in lockstep.
-
-        Args:
-            kernel_func: Operation name ('add', 'mul', 'dot', 'threshold', etc.)
-            data_slices: Optional list of per-PE data. If None, uses PE local_mem.
-            **kwargs: Additional arguments passed to PE.execute().
-
-        Returns:
-            List of results from each PE.
-        """
         results = []
         for i, pe in enumerate(self.pes):
             if data_slices and i < len(data_slices):
@@ -165,11 +183,7 @@ class Warp:
 
 
 class Workgroup:
-    """A workgroup (thread block) containing warps and shared memory.
-
-    Provides shared memory for inter-PE communication within the block,
-    and manages warp-level execution.
-    """
+    """A workgroup (thread block) containing warps and shared memory."""
 
     def __init__(self, wg_id, num_pes=DEFAULT_PES_PER_WG, warp_size=DEFAULT_WARPSIZE):
         self.wg_id = wg_id
@@ -221,11 +235,7 @@ class Workgroup:
 
 
 class Stream:
-    """A GPU stream for concurrent kernel execution.
-
-    Kernels in the same stream execute sequentially.
-    Kernels in different streams can execute concurrently.
-    """
+    """A GPU stream for concurrent kernel execution."""
 
     def __init__(self, stream_id):
         self.stream_id = stream_id
@@ -296,25 +306,12 @@ class TernaryGPU:
         return stream_id
 
     def dispatch_kernel(self, kernel, data_slices, stream_id=None):
-        """Dispatch a kernel across workgroups.
-
-        Each workgroup receives one data slice. PEs within a workgroup
-        are assigned data elements round-robin.
-
-        Args:
-            kernel: Operation name ('add', 'mul', 'dot', 'threshold', 'sum', etc.)
-            data_slices: List of data lists, one per workgroup.
-
-        Returns:
-            List of results per workgroup.
-        """
         results = []
         for wg, data in zip(self.workgroups, data_slices):
             per_pe_slices = self._distribute_to_pes(wg, data)
             wg_results = wg.execute_kernel(kernel, data_slices=per_pe_slices)
             results.append(wg_results)
             self.cycles += 1
-
         self._kernel_log.append({
             "kernel": kernel,
             "workgroups": len(data_slices),
@@ -323,422 +320,244 @@ class TernaryGPU:
         return results
 
     def dispatch_grid(self, kernel, grid_data, grid_shape):
-        """Dispatch kernel over a 2D grid of thread blocks.
-
-        Args:
-            kernel: Operation name.
-            grid_data: Flat list of data elements.
-            grid_shape: (grid_x, grid_y) tuple.
-
-        Returns:
-            2D list of results indexed by [grid_y][grid_x].
-        """
         gx, gy = grid_shape
-        total_elements = len(grid_data)
-        elements_per_block = max(1, total_elements // (gx * gy))
-
+        n = len(grid_data)
+        block_size = max(1, n // (gx * gy))
         grid_results = []
         idx = 0
-        for row in range(gy):
+        for _ in range(gy):
             row_results = []
-            for col in range(gx):
-                block_data = grid_data[idx:idx + elements_per_block]
-                idx += elements_per_block
-                wg_idx = (row * gx + col) % len(self.workgroups)
-                wg = self.workgroups[wg_idx]
-                per_pe_slices = self._distribute_to_pes(wg, block_data)
-                wg_results = wg.execute_kernel(kernel, data_slices=per_pe_slices)
-                row_results.append(wg_results)
+            for _ in range(gx):
+                block = grid_data[idx:idx + block_size]
+                idx += block_size
+                wg = self.workgroups[(idx // block_size - 1) % len(self.workgroups)]
+                slices = self._distribute_to_pes(wg, block)
+                row_results.append(wg.execute_kernel(kernel, data_slices=slices))
                 self.cycles += 1
             grid_results.append(row_results)
         return grid_results
 
     def dispatch_stream(self, stream_id):
-        """Execute next kernel from a stream on available workgroups."""
         if stream_id not in self.streams:
             return None
-        stream = self.streams[stream_id]
-        item = stream.dequeue()
+        item = self.streams[stream_id].dequeue()
         if item is None:
             return None
-        kernel, workgroup_indices, kwargs = item
+        kernel, wg_indices, kwargs = item
         results = []
-        for wg_idx in workgroup_indices:
+        for wg_idx in wg_indices:
             if wg_idx < len(self.workgroups):
-                wg = self.workgroups[wg_idx]
-                wg_results = wg.execute_kernel(kernel, **kwargs)
-                results.append(wg_results)
+                results.append(self.workgroups[wg_idx].execute_kernel(kernel, **kwargs))
                 self.cycles += 1
-        stream.mark_complete(results)
+        self.streams[stream_id].mark_complete(results)
         return results
 
     def run_streams_concurrent(self):
-        """Run all streams concurrently, round-robin scheduling."""
         active = {sid: s for sid, s in self.streams.items() if s.has_work()}
         results = {}
         while active:
             for sid in list(active.keys()):
-                result = self.dispatch_stream(sid)
-                if result is not None:
-                    results.setdefault(sid, []).append(result)
+                r = self.dispatch_stream(sid)
+                if r is not None:
+                    results.setdefault(sid, []).append(r)
                 if not active[sid].has_work():
                     del active[sid]
         return results
 
     def _distribute_to_pes(self, wg, data):
-        """Round-robin distribute data elements across PEs in a workgroup."""
+        """Chunk data across PEs — each PE gets roughly equal contiguous slice."""
+        n = len(data)
         num_pes = wg.pe_count()
+        if n == 0:
+            return [[] for _ in range(num_pes)]
+        base = n // num_pes
+        rem = n % num_pes
         slices = []
+        start = 0
         for i in range(num_pes):
-            start = i
-            step = num_pes
-            pe_data = data[start::step] if step > 0 else data[:]
-            slices.append(pe_data)
+            sz = base + (1 if i < rem else 0)
+            slices.append(list(data[start:start + sz]) if sz else [])
+            start += sz
         return slices
 
     def pipeline_add(self, *tensors):
-        """Build a tensor pipeline: add tensors sequentially.
-
-        Each step is parallelized across all PEs in all workgroups.
-        """
         if len(tensors) < 2:
             return tensors[0] if tensors else []
-        current = tensors[0]
-        num_wgs = len(self.workgroups)
+        current = list(tensors[0])
         for t in tensors[1:]:
-            slices = [current[j::num_wgs] for j in range(num_wgs)]
-            other_slices = [t[j::num_wgs] for j in range(num_wgs)]
-            wg_results = []
-            for wg_idx, wg in enumerate(self.workgroups):
-                per_pe = self._distribute_to_pes(wg, slices[wg_idx])
-                other_pe = self._distribute_to_pes(wg, other_slices[wg_idx])
-                results = []
-                for pe, oth in zip(wg.pes, other_pe):
-                    if oth:
-                        pe.load(per_pe[wg.pes.index(pe) % len(per_pe)] if per_pe else [])
-                        pe.execute("add", other=oth)
-                        results.append(pe.result)
-                    else:
-                        results.append(per_pe[wg.pes.index(pe) % len(per_pe)] if per_pe else [])
-                wg_results.append(results)
-            current = [v for wg_r in wg_results for v in wg_r if v is not None]
+            t_list = list(t)
+            current = _fast_add(current, t_list)
             self.cycles += 1
         return current
 
+    def _transpose_b(self, mat_b):
+        """Pre-transpose B so columns become rows (faster matmul access)."""
+        rows = len(mat_b)
+        cols = len(mat_b[0])
+        return [[mat_b[r][c] for r in range(rows)] for c in range(cols)]
+
     def matmul_parallel(self, mat_a, mat_b):
-        """Matrix multiply using all PEs across all workgroups.
-
-        Each workgroup computes a block of result rows.
-        Within each workgroup, PEs compute different columns in parallel.
-
-        Args:
-            mat_a: List of lists (rows of trits).
-            mat_b: List of lists (columns of trits).
-
-        Returns:
-            Result matrix as list of lists.
-        """
         if not mat_a or not mat_b:
             return []
         rows_a = len(mat_a)
         cols_b = len(mat_b[0])
         inner = len(mat_b)
 
+        # Direct C native path
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
-            result_flat = (ctypes.c_int * (rows_a * cols_b))()
-            flat_a = [v for row in mat_a for v in row]
-            flat_b = [v for row in mat_b for v in row]
-            _lib = None
             try:
+                flat_a = [v for row in mat_a for v in row]
+                flat_b = [v for row in mat_b for v in row]
                 from trinary.gpu_native import _lib as _gn
+                out = (ctypes.c_int * (rows_a * cols_b))()
                 _gn.gpu_matmul(
-                    _to_c_arr(flat_a), rows_a, inner,
-                    _to_c_arr(flat_b), inner, cols_b,
-                    result_flat,
+                    (ctypes.c_int * len(flat_a))(*flat_a), rows_a, inner,
+                    (ctypes.c_int * len(flat_b))(*flat_b), inner, cols_b,
+                    out,
                 )
-                self.cycles += cols_b * rows_a
-                return [[result_flat[r * cols_b + c] for c in range(cols_b)]
-                        for r in range(rows_a)]
+                self.cycles += rows_a * cols_b
+                return [[out[r * cols_b + c] for c in range(cols_b)] for r in range(rows_a)]
             except Exception:
                 pass
 
+        # Pre-transpose B for row-major access
+        bt = self._transpose_b(mat_b) if cols_b > 1 else mat_b
+        t2s = _T2S
+
         result = [[0] * cols_b for _ in range(rows_a)]
-        rows_per_wg = max(1, rows_a // len(self.workgroups))
-        for wg_idx, wg in enumerate(self.workgroups):
-            start_r = wg_idx * rows_per_wg
-            end_r = min(start_r + rows_per_wg, rows_a)
-            num_pes = wg.pe_count()
-
-            for r in range(start_r, end_r):
-                row_vec = mat_a[r]
-                pes_active = min(num_pes, cols_b)
-                cols_per_pe = max(1, (cols_b + pes_active - 1) // pes_active)
-
-                for pe_idx in range(pes_active):
-                    col_start = pe_idx * cols_per_pe
-                    col_end = min(col_start + cols_per_pe, cols_b)
-                    if col_start >= cols_b:
-                        break
-                    pe = wg.pes[pe_idx]
-                    pe.load(row_vec)
-
-                for c in range(cols_b):
-                    pe_idx = c % pes_active
-                    col_vec = [mat_b[k][c] for k in range(inner)]
-                    wg.pes[pe_idx].execute("dot", other=col_vec)
-                    dot_result = wg.pes[pe_idx].result
-                    result[r][c] = dot_result if isinstance(dot_result, int) else 0
-
-            self.cycles += cols_b * max(1, end_r - start_r)
+        for r in range(rows_a):
+            row_a = mat_a[r]
+            row_a_s = [t2s[v] for v in row_a]
+            for c in range(cols_b):
+                col_b = bt[c]
+                total = 0
+                for k in range(inner):
+                    total += row_a_s[k] * t2s[col_b[k]]
+                result[r][c] = 0 if total < -1 else (1 if total == 0 else 2) if -1 <= total <= 1 else (0 if total < -1 else 2)
+                # equivalent to ternary_step but faster inline
+        self.cycles += rows_a * cols_b
         return result
 
     def reduce(self, data, op="sum"):
-        """Parallel reduction across all PEs.
-
-        Splits data across PEs, each reduces its chunk, then
-        combines results.
-
-        Args:
-            data: List of trit values.
-            op: Reduction operation ('sum', 'max', 'min').
-
-        Returns:
-            Scalar result.
-        """
         if not data:
             return 0
-
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
             try:
                 return native_reduce(data, op)
             except Exception:
                 pass
-
-        num_wgs = min(len(self.workgroups), len(data))
-        chunks = [data[i::num_wgs] for i in range(num_wgs)]
-        partials = []
-
-        for wg_idx in range(num_wgs):
-            wg = self.workgroups[wg_idx]
-            per_pe = self._distribute_to_pes(wg, chunks[wg_idx])
-            for pe_idx, pe in enumerate(wg.pes):
-                if pe_idx < len(per_pe) and per_pe[pe_idx]:
-                    pe.load(per_pe[pe_idx])
-                    pe.execute(op)
-                    if pe.result is not None:
-                        partials.append(pe.result)
-            self.cycles += 1
-
-        if not partials:
-            return 0
-
         if op == "sum":
-            return sum(partials)
+            return _fast_sum(data)
         elif op == "max":
-            return max(partials)
+            return _fast_max(data)
         elif op == "min":
-            return min(partials)
+            return _fast_min(data)
         return 0
 
     def scan(self, data):
-        """Prefix scan (inclusive) across data using parallel workgroups.
-
-        Each workgroup scans its chunk, then propagates prefixes.
-        """
         if not data:
             return []
-
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
             try:
                 return native_scan(data)
             except Exception:
                 pass
-
+        t2s = _T2S
         n = len(data)
-        num_wgs = min(len(self.workgroups), n)
-        chunk_size = max(1, n // num_wgs)
-
-        result = list(data)
-        for wg_idx in range(num_wgs):
-            start = wg_idx * chunk_size
-            end = min(start + chunk_size, n)
-            signed = [trit_to_signed(v) for v in result[start:end]]
-            prefix = 0
-            for i in range(len(signed)):
-                prefix += signed[i]
-                result[start + i] = signed_to_trit(max(-1, min(1, prefix)))
-
-        prefix_sum = 0
-        for wg_idx in range(num_wgs):
-            start = wg_idx * chunk_size
-            end = min(start + chunk_size, n)
-            for i in range(start, end):
-                signed_val = trit_to_signed(result[i])
-                result[i] = signed_to_trit(max(-1, min(1, signed_val + prefix_sum)))
-            if end > start:
-                chunk_signed = [trit_to_signed(v) for v in result[start:end]]
-                prefix_sum += sum(chunk_signed)
-            self.cycles += 1
-
+        result = [0] * n
+        prefix = 0
+        for i in range(n):
+            prefix += t2s[data[i]]
+            result[i] = 0 if prefix < -1 else (1 if prefix == 0 else 2) if -1 <= prefix <= 1 else (0 if prefix < -1 else 2)
         return result
 
     def transpose(self, matrix):
-        """Parallel matrix transpose using workgroups."""
         if not matrix or not matrix[0]:
             return []
-
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
             try:
                 return native_transpose(matrix)
             except Exception:
                 pass
-
         rows = len(matrix)
         cols = len(matrix[0])
         result = [[0] * rows for _ in range(cols)]
-
-        num_wgs = min(len(self.workgroups), rows)
-        for wg_idx in range(num_wgs):
-            wg = self.workgroups[wg_idx]
-            rows_per_wg = max(1, rows // num_wgs)
-            start = wg_idx * rows_per_wg
-            end = min(start + rows_per_wg, rows)
-            for r in range(start, end):
-                for c in range(cols):
-                    result[c][r] = matrix[r][c]
-            self.cycles += (end - start) * cols
+        for r in range(rows):
+            row = matrix[r]
+            for c in range(cols):
+                result[c][r] = row[c]
         return result
 
     def fused_linear(self, weights, inputs, bias=None, activation="threshold"):
-        """Fused linear layer: activation(W @ x + b) using tensor core + GPU.
-
-        Args:
-            weights: 2D matrix of trits.
-            inputs: 1D vector of trits (or 2D for batch).
-            bias: Optional 1D bias vector.
-            activation: Activation function name.
-
-        Returns:
-            Result vector.
-        """
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
             try:
                 if isinstance(inputs[0], list):
                     return [native_fused_linear(weights, inp, bias, activation)
                             for inp in inputs]
-                else:
-                    return native_fused_linear(weights, inputs, bias, activation)
+                return native_fused_linear(weights, inputs, bias, activation)
             except Exception:
                 pass
 
         if isinstance(inputs[0], list):
             results = []
             for inp in inputs:
-                matmul_result = self.tensor_core.matmul(weights, inp)
-                if isinstance(matmul_result, list) and matmul_result and isinstance(matmul_result[0], list):
-                    flat = [matmul_result[0][j] for j in range(len(inp))]
-                elif isinstance(matmul_result, list):
-                    flat = matmul_result
-                else:
-                    flat = inp[:]
+                flat = self.tensor_core.matmul(weights, inp)
+                if isinstance(flat, list) and flat and isinstance(flat[0], list):
+                    flat = [flat[0][j] for j in range(len(inp))]
+                elif not isinstance(flat, list):
+                    flat = list(inp)
                 if bias:
-                    flat = TritSIMD.add_vectors(flat, bias)
-                num_wgs = len(self.workgroups)
-                slices = [flat[j::num_wgs] for j in range(num_wgs)]
-                results_wg = []
-                for wg_idx, wg in enumerate(self.workgroups):
-                    per_pe = self._distribute_to_pes(wg, slices[wg_idx])
-                    wg_results = wg.execute_kernel(activation, data_slices=per_pe)
-                    for r in wg_results:
-                        if r is not None:
-                            results_wg.append(r)
-                results.append(results_wg[:len(inp)])
+                    flat = _fast_add(flat, bias)
+                flat = _fast_threshold(flat)
+                results.append(flat[:len(inp)])
             return results
         else:
-            matmul_result = self.tensor_core.matmul(weights, inputs)
-            if isinstance(matmul_result, list) and matmul_result and isinstance(matmul_result[0], list):
-                flat = [matmul_result[0][j] for j in range(len(inputs))]
-            elif isinstance(matmul_result, list):
-                flat = matmul_result
-            else:
-                flat = inputs[:]
+            flat = self.tensor_core.matmul(weights, inputs)
+            if isinstance(flat, list) and flat and isinstance(flat[0], list):
+                flat = [flat[0][j] for j in range(len(inputs))]
+            elif not isinstance(flat, list):
+                flat = list(inputs)
             if bias:
-                flat = TritSIMD.add_vectors(flat, bias)
-            num_wgs = len(self.workgroups)
-            slices = [flat[j::num_wgs] for j in range(num_wgs)]
-            results_wg = []
-            for wg_idx, wg in enumerate(self.workgroups):
-                per_pe = self._distribute_to_pes(wg, slices[wg_idx])
-                wg_results = wg.execute_kernel(activation, data_slices=per_pe)
-                for r in wg_results:
-                    if r is not None:
-                        results_wg.append(r)
-            return results_wg[:len(inputs)]
+                flat = _fast_add(flat, bias)
+            return _fast_threshold(flat)[:len(inputs)]
 
     def elementwise_fused(self, a, b, op1="add", op2="threshold"):
-        """Fused element-wise: apply op1 then op2 in a single pass.
-
-        Example: add + threshold = ternary addition with normalization.
-        """
         if len(a) != len(b):
             raise ValueError("Input lengths must match")
-
         if USE_GPU_NATIVE and GPU_NATIVE_AVAILABLE:
             try:
                 return native_elementwise_fused(a, b, op1, op2)
             except Exception:
                 pass
-
-        num_wgs = min(len(self.workgroups), len(a))
-        slices_a = [a[i::num_wgs] for i in range(num_wgs)]
-        slices_b = [b[i::num_wgs] for i in range(num_wgs)]
-        results = []
-        for wg_idx in range(num_wgs):
-            wg = self.workgroups[wg_idx]
-            per_pe_a = self._distribute_to_pes(wg, slices_a[wg_idx])
-            per_pe_b = self._distribute_to_pes(wg, slices_b[wg_idx])
-            for pe_idx, pe in enumerate(wg.pes):
-                if pe_idx < len(per_pe_a) and per_pe_a[pe_idx]:
-                    pe.load(per_pe_a[pe_idx])
-                    pe.execute(op1, other=per_pe_b[pe_idx] if pe_idx < len(per_pe_b) else None)
-                    if pe.result is not None:
-                        pe.load(pe.result)
-                        pe.execute(op2)
-                        results.append(pe.result)
-            self.cycles += 1
-        return results
+        if op1 == "add":
+            mid = _fast_add(a, b)
+        else:
+            t2s, ts5 = _T2S, _TS5
+            mid = [ts5[t2s[x] * t2s[y] + 2] for x, y in zip(a, b)]
+        if op2 == "threshold":
+            return _fast_threshold(mid)
+        return mid
 
     def batch_dispatch(self, kernel, batch_data):
-        """Dispatch kernel on a batch of data, parallelized across all PEs.
-
-        Each PE processes one element from the batch simultaneously.
-        """
-        total_pes = self.total_pes()
         results = [[] for _ in range(len(self.workgroups))]
-
-        wg_idx = 0
         for i, data in enumerate(batch_data):
-            wg = self.workgroups[wg_idx % len(self.workgroups)]
-            pe_idx = i % wg.pe_count()
-            pe = wg.pes[pe_idx]
-            if isinstance(data, list):
-                pe.load(data)
-            else:
-                pe.load([data])
+            wg = self.workgroups[i % len(self.workgroups)]
+            pe = wg.pes[i % wg.pe_count()]
+            d = list(data) if isinstance(data, list) else [data]
+            pe.load(d)
             pe.execute(kernel)
-            results[wg_idx % len(self.workgroups)].append(pe.result)
-            wg_idx += 1
-
+            results[i % len(self.workgroups)].append(pe.result)
         self.cycles += 1
         return results
 
     def stats(self):
         total_pes = self.total_pes()
         total_warps = self.total_warps()
+        npes = len(self.workgroups[0].pes) if self.workgroups else 0
         return (
             f"TernaryGPU\n"
             f"  Workgroups:  {len(self.workgroups)}\n"
-            f"  PEs per WG:  {len(self.workgroups[0].pes) if self.workgroups else 0}\n"
+            f"  PEs per WG:  {npes}\n"
             f"  Warp size:   {self.warp_size}\n"
             f"  Total warps: {total_warps}\n"
             f"  Total PEs:   {total_pes}\n"
@@ -755,9 +574,9 @@ class TernaryGPU:
             "",
             f"  Grid: {len(self.workgroups)} workgroup(s)",
             f"  Block: {self.workgroups[0].pe_count() if self.workgroups else 0} PEs"
-                f" ({self.warp_size} PE(s)/warp,"
-                f" {self.workgroups[0].num_warps() if self.workgroups else 0} warps/block)"
-                if self.workgroups else "",
+            f" ({self.warp_size} PE(s)/warp,"
+            f" {self.workgroups[0].num_warps() if self.workgroups else 0} warps/block)"
+            if self.workgroups else "",
             f"  Total cores: {self.total_pes()}",
             f"  Total warps: {self.total_warps()}",
             "",

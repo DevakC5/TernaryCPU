@@ -10,7 +10,7 @@ import random
 from trinary.ai.activations import signed_to_trit, trit_to_signed, ternary_step
 from trinary.ai.perceptron import Perceptron
 from trinary.ai.ternary_nn import TernaryNeuralNetwork
-from trinary.ai.optimizers import SGDOptimizer, TernaryHillClimber
+from trinary.ai.optimizers import SGDOptimizer, BackpropOptimizer, TernaryHillClimber
 from trinary.ai.losses import classification_error
 from trinary.ai.datasets import (
     AND_DATASET,
@@ -56,6 +56,8 @@ class TernaryTrainer:
             )
         if optimizer is not None:
             self.optimizer = optimizer
+        elif isinstance(model, TernaryNeuralNetwork):
+            self.optimizer = BackpropOptimizer(learning_rate=learning_rate)
         else:
             self.optimizer = SGDOptimizer(learning_rate=learning_rate)
         self.model = model
@@ -160,10 +162,8 @@ class TernaryTrainer:
             signed_b = max(-1, min(1, signed_b))
             self.model.bias = signed_to_trit(signed_b)
         else:
-            for layer in self.model.layers:
-                for neuron in layer:
-                    for inputs, target in shuffled:
-                        self.optimizer.step(neuron, inputs, target[0])
+            for inputs, target in shuffled:
+                self.optimizer.step(self.model, inputs, target)
 
     def _train_epoch_hillclimb(self, dataset):
         if isinstance(self.optimizer, TernaryHillClimber):

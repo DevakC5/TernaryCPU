@@ -25,7 +25,6 @@ The system supports **dual display subsystems** — a legacy text-mode memory-ma
 |----------|------|-------------|
 | PC       | int  | Program counter — address of next instruction |
 | SP       | int  | Stack pointer — starts at 255, grows down to 128 |
-| call_stack | list | Python list for CALL/RET return addresses |
 | flags    | dict | ZERO, EQUAL, GREATER, LESS (set by CMP) |
 
 ### Flag Semantics
@@ -79,7 +78,7 @@ Stack overflow: SP < 128 → StackOverflowError
 Stack underflow: SP >= 255 → StackUnderflowError (on POP)
 ```
 
-The CALL/RET system uses a separate Python-list call stack — not memory.
+CALL/RET use the same hardware memory stack as PUSH/POP (SP grows downward from 255, pushing return address PC+1). This means nested subroutines consume physical stack space and can trigger StackOverflowError.
 
 ---
 
@@ -247,14 +246,21 @@ The SDK keyboard at 9000–9001 supports the Fantasy Console input model, while 
 
 ### Interrupt Flow
 
+On interrupt (software INT or timer), the CPU **automatically saves the full context** to the hardware memory stack before jumping to the handler:
+
+1. Push R0, R1, R2, R3 to stack (SP decrements for each)
+2. Push condition flags (encoded as 3-trit string ZGE: each trit "2"=True, "0"=False)
+3. Push return address (PC)
+
+On `IRET`, the CPU restores in reverse order: pop PC, pop flags, pop R3, R2, R1, R0.
+
 ```
-Main program:                  Handler:
-  ...                            STOREM 0 R0   (save state)
-  EI      (enable interrupts)    ...            (work)
-  ...                            LOADM 0 R0   (restore state)
-  ← timer fires →               IRET          (return, re-enable)
-  ...
+Stack growth during interrupt:
+  SP → ... → [R0] [R1] [R2] [R3] [flags] [PC]     ← SP after push
+        255  254  253  252  251    250     249
 ```
+
+This means interrupt handlers **cannot communicate via registers** — any changes to R0–R3 are overwritten by IRET's restore. Handlers should use memory (STOREM/LOADM) for data shared with the main program.
 
 ### Instructions
 
@@ -262,8 +268,8 @@ Main program:                  Handler:
 |-------------|-------------|
 | `EI` | Set interrupt flag (enable) |
 | `DI` | Clear interrupt flag (disable) |
-| `INT n` | Software interrupt: push PC to stack, jump to IVT[n], disable interrupts |
-| `IRET` | Pop PC from stack, enable interrupts |
+| `INT n` | Software interrupt: save context (R0–R3, flags, PC), jump to IVT[n], disable interrupts |
+| `IRET` | Restore context (PC, flags, R3–R0), enable interrupts |
 | `SETIVT n addr` | Set IVT entry n to address addr |
 | `SETTIMER period` | Set timer period in cycles |
 
@@ -371,19 +377,23 @@ Ternary is more digit-efficient than binary:
 - Full-adder chain: each position adds a+b+carry
 - Returns (sum_string, final_carry)
 
-### Decimal Round-Trip (arithmetic.py)
+### Native Signed-Magnitude Arithmetic (arithmetic.py)
 
-- Used by the CPU ALU
-- Converts both operands to decimal, performs Python operation, converts back
-- Handles negative numbers naturally
-- Slower but correct for signed arithmetic
+- Used by the CPU ALU for all signed arithmetic
+- Implements sign-magnitude logic natively without decimal conversion:
+  - **ADD**: compares magnitudes, routes to ripple-carry adder (same signs) or magnitude subtractor (opposite signs)
+  - **SUB**: negates second operand, delegates to ADD
+  - **MUL**: extracts signs, multiplies magnitudes via digit-by-digit + ripple-carry summation
+  - **DIV**: extracts signs, long division on magnitudes
+- Operates entirely on ternary strings with leading `-` for negatives
+- The ripple-carry adder (`adder.py`) handles the non-negative magnitude core
 
 ### When Each Is Used
 
 | Context | Path |
 |---------|------|
-| ALU ADD/SUB/MUL/DIV | arithmetic.py (decimal round-trip) |
-| Benchmarks / education | adder.py (native base-3) |
+| ALU ADD/SUB/MUL/DIV | arithmetic.py (native signed-magnitude) |
+| Magnitude arithmetic | adder.py (ripple-carry, non-negative only) |
 | CPU PUSH/POP | Memory (no arithmetic) |
 
 ---
@@ -458,9 +468,9 @@ Cycle-accurate hardware microarchitecture for educational computer architecture 
 | `clock.py` | `Clock` | Cycle counter, frequency, period timing |
 | `pipeline.py` | `Pipeline` / `PipelineStage` | 5-stage IF→ID→EX→MEM→WB, bubbles, flushes, ASCII viz |
 | `hazards.py` | `HazardUnit` | RAW hazard detection, forwarding paths, stall insertion |
-| `cache.py` | `Cache` / `CacheLine` | Direct-mapped L1, hit/miss tracking, write-back |
+| `cache.py` | `Cache` / `CacheLine` / `CacheSet` | N-way set-associative L1, LRU replacement, hit/miss tracking, write-back |
 | `branch_predictor.py` | `BranchPredictor` | Static + 2-bit saturating counters |
-| `bus.py` | `Bus` / `BusRequest` | Shared system bus, priority arbitration, contention |
+| `bus.py` | `Bus` / `BusRequest` | Shared system bus, burst transfers, split transactions, priority arbitration, contention |
 | `dma.py` | `DMA` / `DMATransfer` | Async memory-to-memory transfers, concurrent with CPU |
 | `vram_controller.py` | `VRAMController` | Bandwidth limits, scanline timing, frame sync |
 | `interrupts.py` | `InterruptController` | 8-line priority controller, masking, nesting |

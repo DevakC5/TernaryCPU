@@ -63,7 +63,11 @@ OPCODE_MAP = {
     "TACT": "220",
     "TLOADW": "221",
     "TSTOREW": "222",
+    "TCAS": "1000",  # 4-trit opcode — Ternary Compare-And-Swap
 }
+
+# Opcodes with 4-trit encodings (checked before 3-trit)
+FOUR_TRIT_OPCODES = {"1000": "TCAS"}
 
 OPCODE_REVERSE = {v: k for k, v in OPCODE_MAP.items()}
 
@@ -149,6 +153,13 @@ def encode_instruction(instr, labels=None):
             return op_code + operands[0] + operands[1]
         return op_code
 
+    if opcode == "TCAS":
+        addr_op, expected_op, new_op = operands
+        addr_ternary = encode_address(addr_op)
+        expected_trit = encode_register(expected_op)
+        new_trit = encode_register(new_op)
+        return op_code + addr_ternary + expected_trit + new_trit
+
     if opcode in ("STOREM", "LOADM"):
         reg = encode_register(operands[1])
         addr = operands[0]
@@ -205,6 +216,24 @@ def decode_instruction(machine_code):
     """
     if len(machine_code) < 3:
         return f"INVALID: {machine_code}"
+
+    # Check for 4-trit opcodes first (e.g. TCAS)
+    if len(machine_code) >= 4 and machine_code[:4] in FOUR_TRIT_OPCODES:
+        opcode = FOUR_TRIT_OPCODES[machine_code[:4]]
+        rest = machine_code[4:]
+
+        if opcode == "TCAS":
+            from trinary.conversion import ternary_to_decimal
+            # Format: addr_ternary + expected_reg(1trit) + new_reg(1trit)
+            if len(rest) >= 2:
+                addr_trits = rest[:-2]
+                expected_reg = decode_register(rest[-2])
+                new_reg = decode_register(rest[-1])
+                addr = ternary_to_decimal(addr_trits) if addr_trits else 0
+                return f"{opcode} {addr} {expected_reg} {new_reg}"
+            return f"{opcode} ? ? ?"
+
+        return f"{opcode} ?"
 
     opcode_trits = machine_code[:3]
     rest = machine_code[3:]

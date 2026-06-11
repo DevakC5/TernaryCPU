@@ -196,7 +196,7 @@ def render_warp(warp):
     lines = [f"Warp {warp.warp_id} ({len(warp.pes)} PEs, active={warp.active}):"]
     signed = {-1: "-", 0: "0", 1: "+"}
     for pe in warp.pes:
-        data = pe.local_mem.to_list() if len(pe.local_mem) > 0 else []
+        data = pe.data if len(pe.data) > 0 else []
         result = pe.result
         data_str = " ".join(str(v) for v in data[:8])
         if len(data) > 8:

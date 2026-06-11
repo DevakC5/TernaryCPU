@@ -177,12 +177,17 @@ class VisualizationEngine:
             c.hits = cache.hits
             c.misses = cache.misses
             c.hit_rate = cache.hit_rate
-            for line in cache.lines[:32]:
-                c.lines.append({
-                    'tag': line.tag,
-                    'valid': line.valid,
-                    'dirty': line.dirty,
-                })
+            for cache_set in cache.sets:
+                for line in cache_set.lines:
+                    if len(c.lines) >= 32:
+                        break
+                    c.lines.append({
+                        'tag': line.tag,
+                        'valid': line.valid,
+                        'dirty': line.dirty,
+                    })
+                if len(c.lines) >= 32:
+                    break
         return c
 
     def _capture_branch(self, cpu):

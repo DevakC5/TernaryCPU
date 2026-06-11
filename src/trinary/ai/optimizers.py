@@ -1,18 +1,18 @@
 """Optimizers for ternary neural network training.
 
-Provides simple gradient-free and gradient-approximate weight update
-rules that respect the ternary digit constraint (-1, 0, +1).
+Provides SGD for single perceptrons and true backpropagation
+for multi-layer TernaryNeuralNetworks, all operating within
+the signed integer space {-1, 0, +1}.
 """
 
 import random
 
-from trinary.ai.activations import signed_to_trit, trit_to_signed
+from trinary.ai.activations import signed_to_trit, trit_to_signed, ternary_step
 from trinary.ai.perceptron import Perceptron
 from trinary.ai.ternary_nn import TernaryNeuralNetwork
 
 
 def _clamp_signed(value):
-    """Clamp an integer to the valid signed range [-1, 0, 1]."""
     if value < -1:
         return -1
     if value > 1:
@@ -21,35 +21,19 @@ def _clamp_signed(value):
 
 
 class SGDOptimizer:
-    """Stochastic gradient descent for ternary perceptrons.
+    """Stochastic gradient descent for a single ternary perceptron.
 
     Updates each weight: signed_weight += learning_rate * input * error
-    then clamps to [-1, 0, 1] and converts back to ternary digit.
-
-    The error is computed as signed(target) - signed(prediction), which
-    gives -2, -1, 0, 1, or 2. With learning_rate=1 this either leaves
-    the weight unchanged or moves it one step toward the correct value.
+    then clamps to [-1, 0, +1] and converts back to ternary digit.
 
     Args:
-        learning_rate: Step size (default 1). Higher values move faster
-            but may overshoot on ternary weights.
+        learning_rate: Step size (default 1).
     """
 
     def __init__(self, learning_rate=1):
         self.learning_rate = learning_rate
 
     def step(self, perceptron, inputs, target):
-        """Perform one weight update on a single Perceptron.
-
-        Uses sign-based error to move weights in the correct
-        direction by at most ±1 per update, preventing overshoot
-        in the discrete ternary weight space.
-
-        Args:
-            perceptron: A Perceptron instance (modified in place).
-            inputs: List of ternary digits (0/1/2).
-            target: Ternary digit target (0/1/2).
-        """
         prediction = perceptron.forward(inputs)
         signed_inputs = [trit_to_signed(x) for x in inputs]
         signed_target = trit_to_signed(target)
@@ -67,6 +51,95 @@ class SGDOptimizer:
         signed_b += self.learning_rate * error
         signed_b = _clamp_signed(signed_b)
         perceptron.bias = signed_to_trit(signed_b)
+
+
+class BackpropOptimizer:
+    """True backpropagation optimizer for multi-layer TernaryNeuralNetworks.
+
+    Computes gradients through all hidden layers using the chain rule,
+    operating entirely in the signed integer space {-1, 0, +1}.
+    Uses Straight-Through Estimator (STE) for the step activation
+    function — the gradient passes through unchanged.
+
+    Args:
+        learning_rate: Step size (default 1).
+    """
+
+    def __init__(self, learning_rate=1):
+        self.learning_rate = learning_rate
+
+    def _forward_with_activations(self, network, inputs):
+        """Forward pass, storing each layer's signed output.
+
+        Returns:
+            list of list of int: signed activations per layer [layer0, ..., layerN].
+        """
+        signed_inputs = [trit_to_signed(x) for x in inputs]
+        activations = [signed_inputs]
+        current = list(inputs)
+        for layer in network.layers:
+            layer_out = []
+            for neuron in layer:
+                raw = 0
+                for wi, w in enumerate(neuron.weights):
+                    raw += trit_to_signed(w) * trit_to_signed(current[wi])
+                raw += trit_to_signed(neuron.bias)
+                raw = _clamp_signed(raw)
+                out_trit = ternary_step(raw)
+                layer_out.append(out_trit)
+            current = layer_out
+            activations.append([trit_to_signed(x) for x in layer_out])
+        return activations
+
+    def step(self, network, inputs, target):
+        """Perform one backpropagation weight update on the network.
+
+        Args:
+            network: A TernaryNeuralNetwork instance.
+            inputs: List of ternary digits (0/1/2).
+            target: List of ternary digits (0/1/2), the expected output.
+        """
+        if isinstance(network, Perceptron):
+            return SGDOptimizer(learning_rate=self.learning_rate).step(
+                network, inputs, target[0] if isinstance(target, list) else target
+            )
+
+        signed_target = [trit_to_signed(t) for t in target]
+
+        activations = self._forward_with_activations(network, inputs)
+
+        signed_output = activations[-1]
+        deltas = [None] * len(network.layers)
+
+        deltas[-1] = [
+            _clamp_signed(signed_target[i] - signed_output[i])
+            for i in range(len(signed_output))
+        ]
+
+        for li in range(len(network.layers) - 2, -1, -1):
+            layer = network.layers[li + 1]
+            next_delta = deltas[li + 1]
+            delta = []
+            for ni in range(len(network.layers[li])):
+                err = 0
+                for nj, neuron in enumerate(layer):
+                    w_signed = trit_to_signed(neuron.weights[ni])
+                    err += w_signed * next_delta[nj]
+                delta.append(_clamp_signed(err))
+            deltas[li] = delta
+
+        for li, layer in enumerate(network.layers):
+            for ni, neuron in enumerate(layer):
+                signed_w = [trit_to_signed(w) for w in neuron.weights]
+                for wi in range(len(signed_w)):
+                    signed_w[wi] += self.learning_rate * activations[li][wi] * deltas[li][ni]
+                    signed_w[wi] = _clamp_signed(signed_w[wi])
+                neuron.weights = [signed_to_trit(w) for w in signed_w]
+
+                signed_b = trit_to_signed(neuron.bias)
+                signed_b += self.learning_rate * deltas[li][ni]
+                signed_b = _clamp_signed(signed_b)
+                neuron.bias = signed_to_trit(signed_b)
 
 
 class TernaryHillClimber:
@@ -113,8 +186,6 @@ class TernaryHillClimber:
 
     @staticmethod
     def _collect_parameters(model):
-        """Return a flat list of (layer_idx, neuron_idx, param_name, trit)
-        and a snapshot function to restore."""
         params = []
         if isinstance(model, Perceptron):
             for i, w in enumerate(model.weights):
@@ -168,18 +239,6 @@ class TernaryHillClimber:
                 neuron.bias = old
 
     def step(self, model, dataset):
-        """Try multi-parameter mutations and keep changes that improve accuracy.
-
-        Mutates 1 to 3 parameters at once to escape local optima.
-        Tracks the best accuracy seen and restores to it if stuck.
-
-        Args:
-            model: A Perceptron or TernaryNeuralNetwork instance.
-            dataset: List of (inputs, target) tuples.
-
-        Returns:
-            bool: True if the model changed this step.
-        """
         initial_acc = self._evaluate_accuracy(model, dataset)
         best_acc = initial_acc
         accepted = False
@@ -202,6 +261,6 @@ class TernaryHillClimber:
                 for idx, old in zip(indices, old_vals):
                     self._restore_parameter(model, params[idx], old)
             else:
-                pass  # tie — keep mutation (exploration)
+                pass
 
         return accepted

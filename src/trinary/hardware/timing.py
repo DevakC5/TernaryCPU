@@ -17,6 +17,7 @@ INSTRUCTION_LATENCIES = {
     "TLOADW": 10, "TSTOREW": 10,
     "TVECADD": 4, "TMATMUL": 20,
     "TDOT": 6, "TACT": 3,
+    "TCAS": 3,  # Compare-and-swap: read, compare, write — 3 cycles
 }
 
 STAGE_LATENCIES = {

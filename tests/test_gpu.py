@@ -71,7 +71,7 @@ class TestProcessingElement:
         assert pe.result is not None
         pe.reset()
         assert pe.result is None
-        assert len(pe.local_mem) == 0
+        assert len(pe.data) == 0
 
     def test_cycles_increment(self):
         pe = ProcessingElement(0)
@@ -121,7 +121,7 @@ class TestWarp:
         w.add_pe(ProcessingElement(1))
         w.broadcast([2, 0])
         for pe in w.pes:
-            assert pe.local_mem.to_list() == [2, 0]
+            assert pe.data == [2, 0]
 
     def test_active_count(self):
         w = Warp(0, size=2)
@@ -156,7 +156,7 @@ class TestWorkgroup:
         wg = Workgroup(0, num_pes=4, warp_size=2)
         wg.broadcast([2, 0, 2])
         for pe in wg.pes:
-            assert pe.local_mem.to_list() == [2, 0, 2]
+            assert pe.data == [2, 0, 2]
 
     def test_shared_memory(self):
         wg = Workgroup(0, num_pes=4, warp_size=2)

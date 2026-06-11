@@ -7,7 +7,8 @@
 % ── Packages ──────────────────────────────────────────────
 \usepackage[T1]{fontenc}
 \usepackage{textcomp}
-\usepackage{tgheros}
+%\usepackage{tgheros}
+\usepackage{helvet}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
 \usepackage{hyperref}
@@ -172,16 +173,19 @@ We present Trinary, a complete ternary (base-3) computer system simulated entire
 software. Spanning from fundamental ternary logic gates through a 27-opcode central
 processing unit, two-pass assembler, machine-code encoder, dual memory-mapped display
 subsystems, a Fantasy Console software development kit, a structured-language compiler
-(TAL), cycle-accurate hardware microarchitecture simulation, a tensor accelerator
-coprocessor with GPU-mode parallel computing, ternary neural networks, and a WebSocket-
-based web visualizer, Trinary serves as both an educational platform for computer
-architecture and a research vehicle for non-binary computing systems. The system comprises
-approximately 28,000 lines of Python and C code, validated by a test suite of 594 unit
-tests across all subsystems. A native C backend provides up to 13$\times$ speedup on
-arithmetic-heavy workloads through an auto-detected ctypes bridge. This monograph presents
-the complete architecture, design rationale, implementation details, and performance
-characteristics of the Trinary system across 36 chapters with full instruction-set
-reference, hardware specifications, benchmark data, and appendix reference.
+(TAL), cycle-accurate hardware microarchitecture simulation with N-way set-associative
+caches and burst-mode bus transactions, a tensor accelerator coprocessor with GPU-mode
+parallel computing, ternary neural networks trained via native backpropagation, and a
+WebSocket-based web visualizer, Trinary serves as both an educational platform for
+computer architecture and a research vehicle for non-binary computing systems. The system
+comprises approximately 28,000 lines of Python and C code, validated by a test suite of
+703 unit tests across all subsystems. All arithmetic operations use native signed-magnitude
+base-3 circuits without intermediate decimal conversion. A native C backend provides up to
+13$\times$ speedup on arithmetic-heavy workloads through an auto-detected ctypes bridge.
+This monograph presents the complete architecture, design rationale, implementation
+details, and performance characteristics of the Trinary system across 36 chapters with
+full instruction-set reference, hardware specifications, benchmark data, and appendix
+reference.
 \end{abstract}
 
 {\color{trinaryblue}\rule{\textwidth}{0.5pt}}\vspace{0.3cm}
@@ -288,8 +292,8 @@ This work presents the complete Trinary system across 42 chapters organized into
 parts:
 \begin{itemize}
     \item \textbf{Part I -- Foundations}: Chapters~\ref{ch:intro}--\ref{ch:memory}
-          cover ternary number representation, logic gates, adder circuits, arithmetic
-          via decimal round-trip, the arithmetic logic unit (ALU), register file, memory
+          cover ternary number representation, logic gates, adder circuits, native
+          signed-magnitude arithmetic, the arithmetic logic unit (ALU), register file, memory
           architecture, and comparison to related systems;
     \item \textbf{Part II -- CPU Architecture}: Chapters~\ref{ch:cpu}--\ref{ch:timer}
           detail the 27-opcode instruction set, fetch-decode-execute cycle, data
@@ -449,12 +453,12 @@ Trinary follows a five-layer abstraction stack, each layer building on the one b
 \begin{enumerate}
     \item \textbf{Logic Layer}: Ternary logic gates (TNOT, TAND, TOR) operating on
           single trits. Implemented in \code{logic.py}.
-    \item \textbf{ALU Layer}: Arithmetic and logical operations via decimal round-trip
-          (for signed arithmetic) or native ripple-carry addition (for educational use).
+    \item \textbf{ALU Layer}: Arithmetic and logical operations via native signed-magnitude
+          arithmetic (with ripple-carry adder for the magnitude core).
           Implemented in \code{alu.py}, \code{arithmetic.py}, and \code{adder.py}.
     \item \textbf{CPU Layer}: Fetch-decode-execute cycle with 27 opcodes, 4 general-
-          purpose registers, dual stacks (memory-based PUSH/POP and Python-list
-          CALL/RET), interrupt system, and timer. Implemented in \code{cpu.py}.
+          purpose registers, unified hardware stack (SP, used by PUSH/POP/CALL/RET/INT/IRET),
+          interrupt system with automatic context save/restore, and timer. Implemented in \code{cpu.py}.
     \item \textbf{Assembler Layer}: Two-pass assembly with symbolic labels and
           machine-code encoding. Implemented in \code{assembler.py} and
 
@@ -586,7 +590,7 @@ Trinary uses \emph{signed-magnitude} representation:
 This is not balanced ternary (which uses digits $\{-1,0,1\}$). The signed-magnitude
 convention was chosen for simplicity of implementation and clarity for educational use.
 The tradeoff is that arithmetic must handle sign separately from magnitude, which the
-decimal round-trip approach naturally accommodates.
+native signed-magnitude arithmetic module naturally accommodates.
 
 %====================================================================
 \chapter{Environment Setup and Testing}
@@ -690,7 +694,7 @@ All functions handle signed-magnitude negative numbers, zero, invalid input dete
 and edge cases. The conversion layer is the bridge between the user's mental model
 (decimal integers) and the CPU's internal representation (ternary strings), and is
 used by every other subsystem --- the assembler (for immediate values), the ALU (for
-decimal round-trip arithmetic), the display (for ASCII codes), and the neural network
+native signed-magnitude arithmetic), the display (for ASCII codes), and the neural network
 framework (for signed-offset encoding).
 
 \section{Conversion Algorithms}
@@ -885,7 +889,8 @@ one- and two-operand functions.
 \label{ch:adder}
 
 Trinary implements two distinct addition paths: a native base-3 ripple-carry adder
-for educational purposes and a decimal round-trip method used by the production CPU.
+for magnitude-only operations and a full signed-magnitude adder in the arithmetic
+module used by the production CPU.
 
 \section{Native Ternary Adder}
 
@@ -954,60 +959,102 @@ The native adder handles only non-negative strings of digits $\{0,1,2\}$. It doe
 support signed numbers, making it unsuitable for general-purpose CPU arithmetic without
 additional sign-handling logic.
 
-\section{Decimal Round-Trip}
+\section{Native Signed-Magnitude Arithmetic}
 
-The CPU ALU uses a fundamentally different approach that naturally handles signed
-numbers:
+The CPU ALU now uses native signed-magnitude arithmetic operating entirely on ternary
+strings without any intermediate decimal conversion. The \code{arithmetic.py} module
+orchestrates four operations using the ripple-carry adder (\S\ref{ch:adder}) as its
+magnitude core:
 
-\[
-\code{add}(a,b) = \code{decimal\_to\_ternary}\bigl(
-\code{ternary\_to\_decimal}(a) + \code{ternary\_to\_decimal}(b)\bigr).
-\]
+\begin{description}
+    \item[Addition:] The sign-magnitude adder compares the magnitudes of both operands.
+          If signs match, magnitudes are added via the ripple-carry adder and the common
+          sign is applied. If signs differ, the smaller magnitude is subtracted from the
+          larger using a borrow-propagating subtractor, and the result takes the sign of
+          the larger magnitude.
+    \item[Subtraction:] Implemented as addition with the second operand negated.
+    \item[Multiplication:] Signs are XORed. Magnitudes are multiplied digit-by-digit:
+          each digit of the multiplier is multiplied against the entire multiplicand,
+          the partial products are shifted by position, and summed via repeated
+          ripple-carry addition.
+    \item[Division:] Signs are XORed. Magnitudes are divided using base-3 long division:
+          at each position, the largest single-trit multiplier $(0,1,2)$ whose product
+          with the divisor fits the current remainder is selected, mirroring the familiar
+          pen-and-paper algorithm.
+\end{description}
 
-This converts both operands to Python integers, performs the arithmetic in the host
-environment, and converts the result back to a ternary string. The same pattern extends
-to subtraction, multiplication, and division. This method is slower than native ternary
-arithmetic but guarantees correctness for all signed values.
+This approach is slower than a hypothetical native balanced-ternary datapath but
+guarantees correctness for all signed-magnitude values while operating entirely within
+the base-3 digit space.
 
 %====================================================================
-\chapter{Arithmetic via Decimal Round-Trip}
+\chapter{Native Signed-Magnitude Arithmetic}
 \label{ch:arithmetic}
 
-The \code{arithmetic.py} module provides four arithmetic operations, all using the
-decimal round-trip approach.
+The \code{arithmetic.py} module implements all four ALU operations using native
+signed-magnitude logic on ternary strings.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{decimal_roundtrip.pdf}
-\caption{Decimal round-trip pipeline --- ternary strings are converted to integers, the arithmetic operation is performed in Python, and the result is converted back to ternary}
-\label{fig:decroundtrip}
+\caption{Native signed-magnitude arithmetic pipeline --- operations are performed entirely within the ternary digit space using sign comparison, magnitude addition/subtraction via ripple-carry, digit-by-digit multiplication, and base-3 long division}
+\label{fig:native_arith}
 \end{figure}
 
-\subsection*{Addition}
+\subsection{Native Addition and Subtraction}
+
+Let $a_s, b_s \in \{+,-\}$ be the signs and $a_m, b_m$ the magnitude
+strings. The addition function $f_+$ is defined piecewise:
+
 \[
-\code{add\_ternary}(a,b) = d2t\bigl(t2d(a) + t2d(b)\bigr)
+f_+(a,b) =
+\begin{cases}
+  +(a_m +_3 b_m) & \text{if } a_s = b_s, \\
+  +(a_m -_3 b_m) & \text{if } a_s \neq b_s \text{ and } |a| > |b|, \\
+  -(b_m -_3 a_m) & \text{if } a_s \neq b_s \text{ and } |a| < |b|, \\
+  0              & \text{if } a_s \neq b_s \text{ and } |a| = |b|.
+\end{cases}
 \]
 
-\subsection*{Subtraction}
-\[
-\code{subtract\_ternary}(a,b) = d2t\bigl(t2d(a) - t2d(b)\bigr)
-\]
-Handles negative results through signed-magnitude encoding.
+where $+_3$ denotes ripple-carry addition (\S\ref{ch:adder})
+and $-_3$ denotes borrow-propagating magnitude subtraction:
 
-\subsection*{Multiplication}
 \[
-\code{multiply\_ternary}(a,b) = d2t\bigl(t2d(a) \times t2d(b)\bigr)
+a_m -_3 b_m = \text{the unique string } d \text{ such that } a_m = b_m +_3 d.
 \]
-Supports negative operands via sign manipulation on the converted integers.
 
-\subsection*{Division}
+\subsection{Native Multiplication}
+
+Multiplication separates sign and magnitude:
+
 \[
-\code{divide\_ternary}(a,b) = d2t\bigl(t2d(a) \mathbin{//} t2d(b)\bigr)
+\text{mul}(a,b) = \text{sign}(a) \oplus \text{sign}(b) \cdot (a_m \times_3 b_m)
 \]
-Uses floor division. Raises \code{ZeroDivisionError} on division by zero.
 
-The \code{validate\_ternary} lambda function ensures all inputs are well-formed before
-computation.
+where $\times_3$ is digit-by-digit ternary multiplication. Let
+$a_m = a_{n-1}\ldots a_0$ and $b_m = b_{m-1}\ldots b_0$ be the
+magnitude strings. Then:
+
+\[
+a_m \times_3 b_m = \sum_{j=0}^{m-1} \bigl( (b_j \cdot_3 a_m) \ll_3 j \bigr)
+\]
+
+where $\cdot_3$ multiplies each digit of $a_m$ by the scalar $b_j \in \{0,1,2\}$
+with carry propagation, and $\ll_3 j$ shifts left by $j$ ternary places.
+
+\subsection{Native Division}
+
+Division is base-3 long division on magnitude strings. For each
+position, the quotient digit $q \in \{0,1,2\}$ is selected as the
+largest value such that $q \times_3 b_m \leq$ current remainder. The
+remainder is updated:
+
+\[
+r_{i+1} = r_i -_3 (q \times_3 b_m \ll_3 k)
+\]
+
+The sign of the quotient is $\text{sign}(a) \oplus \text{sign}(b)$; the
+remainder carries the dividend's sign.
 
 \section{Context: When Each Path Is Used}
 
@@ -1019,17 +1066,17 @@ computation.
 \toprule
 Context & Path \\
 \midrule
-CPU ALU (ADD/SUB/MUL/DIV) & \code{arithmetic.py} (decimal round-trip) \\
-Educational benchmarks & \code{adder.py} (native base-3) \\
+CPU ALU (ADD/SUB/MUL/DIV) & \code{arithmetic.py} (native signed-magnitude) \\
+Magnitude core & \code{adder.py} (ripple-carry, non-negative only) \\
 PUSH/POP & Memory access (no arithmetic) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Formal Correctness of Decimal Round-Trip}
+\section{Formal Correctness of Native Addition}
 
-We prove that the decimal round-trip implements the same function as
-native base-3 addition for the restricted domain of non-negative integers.
+We prove that the piecewise native addition implements the same
+function as integer addition for signed-magnitude ternary strings.
 
 \subsection{Definitions}
 
@@ -1037,66 +1084,47 @@ Let $\Sigma = \{0,1,2\}$ be the ternary digit alphabet. For a ternary
 string $s = d_{n-1} \ldots d_0 \in \Sigma^n$, define:
 
 \[
-\text{val}(s) = \sum_{i=0}^{n-1} d_i \cdot 3^i, \qquad
-\text{str}_n(x) = \text{the unique } s \in \Sigma^n \text{ such that } \text{val}(s) = x.
+\text{val}(s) = \sum_{i=0}^{n-1} d_i \cdot 3^i.
 \]
 
-\noindent where $\text{str}_n(x)$ pads with leading zeros to length $n$.
+\noindent For signed-magnitude strings, $\text{sval}(-s) = -\text{val}(s)$
+and $\text{sval}(+s) = \text{val}(s)$.
 
 \subsection{Theorem}
 
-For all non-negative integers $a,b < 3^n$:
+For all signed-magnitude ternary strings $a,b$:
 
 \[
-\text{add\_ternary}(\text{str}_n(a),\; \text{str}_n(b)) = \text{str}_{n+1}(a + b).
+\text{sval}\bigl(f_+(a,b)\bigr) = \text{sval}(a) + \text{sval}(b).
 \]
-
-\noindent where the right-hand side may produce an $(n+1)$-trit result
-representing values up to $2 \cdot 3^n - 2$.
 
 \subsection{Proof Sketch}
 
-The implementation consists of three steps:
+The proof proceeds by case analysis on the sign combination:
 
 \begin{enumerate}
-    \item \textbf{Conversion}: $t2d(s) = \text{val}(s)$. Each digit
-          contributes $d_i \cdot 3^i$. This matches the standard
-          positional interpretation of a base-3 numeral.
-    \item \textbf{Integer addition}: $a_{\text{int}} + b_{\text{int}} =
-          \text{val}(s_a) + \text{val}(s_b)$. Integer addition over
-          $\mathbb{Z}$ is associative, commutative, and closed for
-          the given domain.
-    \item \textbf{Reverse conversion}: $d2t(x)$ repeatedly divides
-          $x$ by 3, recording remainders as ternary digits. This
-          recovers $\text{str}(x)$ by the division algorithm:
-          for any $x \in \mathbb{N}$, $x = q \cdot 3 + r$ with
-          $r \in \{0,1,2\}$, uniquely determining the least
-          significant digit. Iterating recovers all digits.
+    \item \textbf{Same sign}: The ripple-carry adder computes
+          $\text{val}(a_m) + \text{val}(b_m)$ correctly per
+          the half/full-adder truth tables (\S\ref{ch:adder}).
+          The common sign is preserved.
+    \item \textbf{Different signs}, $|a| > |b|$: The borrow-propagating
+          subtractor computes $\text{val}(a_m) - \text{val}(b_m) \geq 0$.
+          The magnitude comparator guarantees correct ordering.
+    \item \textbf{Different signs}, $|a| < |b|$: Symmetric to (2)
+          with sign negation.
+    \item \textbf{Equal magnitude, opposite signs}: The magnitudes
+          cancel, yielding $(-a_m +_3 a_m) = 0$.
 \end{enumerate}
 
-\noindent Therefore $\text{add\_ternary}(s_a, s_b) = \text{str}(\text{val}(s_a)
-+ \text{val}(s_b))$, which is exactly the positional base-3 sum.
-
-\subsection{Extension to Signed Integers}
-
-For signed-magnitude representation (leading $-$\code{)}:
-\[
-\text{val}(-s) = -\text{val}(s).
-\]
-The conversion functions handle the leading minus sign by negating the
-integer value. Addition then follows the same round-trip path:
-\[
-\text{add\_ternary}(-a, b) = d2t\bigl(-t2d(a) + t2d(b)\bigr).
-\]
-The result inherits the correct sign through signed-magnitude encoding.
-The same reasoning applies to subtraction, multiplication, and division,
-each using the corresponding integer operation in step 2.
+\noindent The same reasoning extends to subtraction (as addition of the
+negand), multiplication (via signed magnitude), and division (via
+signed long division).
 
 \section{Scope of Correctness}
 
 The proof covers all values representable in the ternary CPU's variable-
 length encoding. For register operations (maximum 16 trits per register),
-the domain is $0 \leq a,b < 3^{16} \approx 43$ million. The implementation
+the domain is $0 \leq \text{val}(a), \text{val}(b) < 3^{16} \approx 43$ million. The implementation
 imposes no artificial bounds beyond available memory.
 
 %====================================================================
@@ -1674,11 +1702,12 @@ result plus flag updates.
 
 \begin{description}
     \item[\code{ADD R\_dst R\_src}] (format A, 1 cycle): $R_{dst} \gets
-          R_{dst} + R_{src}$. Uses decimal round-trip: both operands are converted
-          to integers, summed, and the result is converted back to ternary.
-          Sets flags based on the result compared to zero.
+          R_{dst} + R_{src}$. Uses native signed-magnitude addition: signs are
+          compared and magnitudes are combined via the ripple-carry adder
+          (\S\ref{ch:adder}). Sets flags based on the result compared to zero.
     \item[\code{SUB R\_dst R\_src}] (format A, 1 cycle): $R_{dst} \gets
-          R_{dst} - R_{src}$. Same round-trip mechanism as ADD. Sets flags.
+          R_{dst} - R_{src}$. Implemented as addition with the second operand
+          negated. Sets flags.
     \item[\code{MUL R\_dst R\_src}] (format A, 3 cycles): $R_{dst} \gets
           R_{dst} \times R_{src}$. Multiplication of signed-magnitude ternary strings.
           The higher cycle cost reflects the increased complexity of multi-digit
@@ -1802,49 +1831,56 @@ skip:
 \label{ch:subroutines}
 
 Subroutines enable code reuse, modular programming, and structured decomposition of
-complex programs. Trinary implements a dual-stack design: CALL/RET use a Python list
-(\code{call\_stack}) entirely independent from the memory stack used by PUSH/POP.
-This separation prevents accidental corruption of return addresses and eliminates the
-need for a dedicated link register.
+complex programs. Trinary uses a unified hardware stack: CALL and RET share the same
+physical memory stack (SP, addresses 128--255) as PUSH and POP. This eliminates the
+need for a dedicated link register and ensures architectural realism at the cost of
+making subroutine nesting subject to stack overflow.
 
 \section{Mechanism}
 
 \begin{description}
     \item[\code{CALL addr}] (format D, 3 cycles):
           \begin{enumerate}
-              \item Push $\code{PC} + 1$ onto \code{call\_stack};
-              \item Set $\code{PC} \gets \code{addr}$.
+              \item Compute $\code{return\_addr} = \code{PC} + 1$;
+              \item $\code{memory[SP]} \gets \code{to\_ternary(return\_addr)}$;
+              \item $\code{SP} \gets \code{SP} - 1$;
+              \item $\code{PC} \gets \code{addr}$.
           \end{enumerate}
     \item[\code{RET}] (format E, 3 cycles):
           \begin{enumerate}
-              \item Pop address from \code{call\_stack};
-              \item Set $\code{PC} \gets \code{popped\_addr}$.
+              \item $\code{SP} \gets \code{SP} + 1$;
+              \item $\code{return\_addr} \gets \code{from\_ternary(memory[SP])}$;
+              \item $\code{PC} \gets \code{return\_addr}$.
           \end{enumerate}
 \end{description}
 
-The 3-cycle cost reflects the additional push/pop on the Python call stack. CALL
-saves the next instruction address (PC + 1), so execution resumes after the CALL
-site when RET executes.
+The push/pop conventions mirror PUSH/POP exactly: SP is pre-decremented on CALL and
+post-incremented on RET. CALL saves $\code{PC} + 1$, so execution resumes after the
+CALL site when RET executes.
+
+\section{Stack Overflow Risk}
+
+Because CALL/RET share physical stack space with PUSH/POP and interrupt context saves,
+nested subroutines consume the finite 128-cell stack (addresses 128--255). Deep or
+recursive subroutines can collide with program data below address 128, raising
+\code{StackOverflowError}. The maximum nesting depth depends on the per-frame state:
+each CALL consumes 1 cell for the return address (plus any PUSH operations within
+the subroutine body).
 
 \section{Design Rationale}
 
-The separation of return-address stack from data stack prevents accidental corruption
-of return addresses by PUSH/POP operations. In architectures that share a single
-stack, a miscalculated POP can corrupt the return address and crash the program.
-With the dual-stack design:
-\begin{itemize}
-    \item The \code{call\_stack} contains only return addresses;
-    \item The memory stack (SP, addresses 128--255) contains only program data;
-    \item A memory stack underflow cannot corrupt the return chain.
-\end{itemize}
-Nesting is supported to arbitrary depth (limited only by Python's list capacity).
-RET on an empty call stack raises \code{StackUnderflowError}.
+The unified stack design was chosen for architectural realism over the earlier dual-stack
+approach (which used a separate Python list for return addresses). Real ternary hardware
+would have a single memory stack, and the unified design exposes the real constraint:
+subroutine depth is bounded by available stack space. Subroutine authors must manage the
+stack budget carefully, particularly when combining nested calls with interrupt handlers
+(which consume 6 cells per context save).
 
 Example:
 \begin{lstlisting}
 start:
     LOAD R0 10
-    CALL func     # Push PC+1, jump to func
+    CALL func     # Push return address, jump to func
     HALT
 func:
     ADD R0 R1     # Subroutine body
@@ -1857,10 +1893,12 @@ Trinary uses a simple register-based calling convention:
 \begin{itemize}
     \item R0--R2: Argument and return value registers (caller-saved);
     \item R3: Always zero (convention);
-    \item Return address is preserved on the \code{call\_stack} automatically.
+    \item Return address is preserved on the hardware stack automatically.
 \end{itemize}
-Subroutines that modify R0--R2 should save and restore them using the memory stack
-(PUSH/POP) if the caller expects preserved values.
+Subroutines that modify R0--R2 should save and restore them using PUSH/POP on the
+same stack if the caller expects preserved values. Unlike interrupt handlers (which
+auto-save context), CALL/RET do not automatically save registers --- the subroutine
+body is responsible for preserving any register it modifies.
 
 %====================================================================
 \chapter{Stack Operations: PUSH and POP}
@@ -1868,7 +1906,9 @@ Subroutines that modify R0--R2 should save and restore them using the memory sta
 
 The memory stack uses the SP register (initialized to 255) and grows downward to a
 minimum of 128, providing 128 cells of dedicated stack storage in the default 512-cell
-memory configuration.
+memory configuration. CALL, RET, INT, and IRET share this same physical stack: each
+CALL consumes 1 cell for the return address, each INT consumes 6 cells for context
+(R0--R3, flags, PC).
 
 \section{Mechanism}
 
@@ -1888,8 +1928,8 @@ memory configuration.
           SP is first incremented, then the value is read (post-increment semantics).
 \end{description}
 
-The 2-cycle cost reflects the memory read/write latency. PUSH and POP are the only
-instructions that implicitly access memory (other than LOADM/STOREM).
+The 2-cycle cost reflects the memory read/write latency. PUSH and POP share the stack
+with CALL, RET, INT, and IRET, all of which implicitly access memory through SP.
 
 \section{Error Conditions}
 
@@ -1904,13 +1944,14 @@ instructions that implicitly access memory (other than LOADM/STOREM).
 
 \section{Typical Usage}
 
-The memory stack is used for three purposes:
+The memory stack is used for four purposes:
 \begin{enumerate}
     \item \textbf{Scratch storage}: Temporarily save register values across
           subroutine calls;
-    \item \textbf{Interrupt context saving}: The interrupt handler pushes affected
-          registers and pops them before IRET;
-    \item \textbf{Local variables}: Space can be reserved by decrementing SP
+    \item \textbf{Return addresses}: CALL pushes the return address; RET pops it;
+    \item \textbf{Interrupt context saving}: INT pushes R0--R3, flags, and PC
+          (6 cells); IRET restores them;
+    \item \textbf{Local variables}: Space can be reserved by decrementing SP.
           directly (via SUB on the SP value stored in memory), though this is
           uncommon.
 \end{enumerate}
@@ -2119,9 +2160,9 @@ instruction strings for the CPU. It uses a two-pass design to handle forward ref
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{assembler_flow.pdf}
-\caption{Two-pass assembler flow --- Pass 1 builds the symbol table, Pass 2 resolves forward branch references}
-\label{fig:asmflow}
+\includegraphics[width=0.85\textwidth]{training_flow.pdf}
+\caption{Training strategies --- SGD (left) uses sign-sign LMS gradient updates; BackpropOptimizer (right) uses true backpropagation with Straight-Through Estimator for hidden-layer learning}
+\label{fig:trainflow}
 \end{figure}
 
 \section{Assembly Syntax}
@@ -3375,9 +3416,11 @@ char* ternary_add(const char *a, const char *b) {
 }
 \end{lstlisting}
 
-The \code{ternary\_to\_int} and \code{int\_to\_ternary} conversion pair is the
-C equivalent of the Python decimal round-trip, providing identical semantics at
-approximately 5$\times$ the speed. The full adder implementation uses native
+The \code{ternary\_to\_int} and \code{int\_to\_ternary} conversion pair was
+the original C equivalent of the now-replaced Python decimal round-trip. The
+current C implementation, like the Python one, uses native signed-magnitude
+logic; the conversion-based version remains in the codebase only for the
+benchmark comparison in \S\ref{ch:native}. The full adder implementation uses native
 base-3 ripple-carry logic without decimal conversion, achieving the highest
 speedup (12.9$\times$).
 
@@ -3596,14 +3639,14 @@ future revisions.
 
 \section{L1 Cache System}
 
-The cache subsystem provides two independent direct-mapped L1 caches:
-a 256-byte instruction cache (\code{icache}) and a 256-byte data cache
-(\code{dcache}).
+The cache subsystem provides two independent N-way set-associative L1 caches:
+a 1024-byte instruction cache (\code{icache}) and a 1024-byte data cache
+(\code{dcache}), each with 32 sets and 2-way associativity with LRU replacement.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{cache_organization.pdf}
-\caption{Direct-mapped L1 cache --- tag array indexed by address bits, data array with 64 lines of 8 bytes each, plus dirty and valid flags}
+\caption{N-way set-associative L1 cache --- tag array indexed by address set bits, data array with 32 sets of 2 ways (16 bytes per line), plus LRU tracking, dirty, and valid flags}
 \label{fig:cacheorg}
 \end{figure}
 
@@ -3627,9 +3670,10 @@ Each \code{CacheLine} uses \code{\_\_slots\_\_} for memory efficiency:
 \toprule
 Parameter & Value \\
 \midrule
-Size & 256 bytes \\
-Line size & 8 bytes \\
-Number of lines & 32 \\
+Size & 1024 bytes \\
+Line size & 16 bytes \\
+Number of sets & 32 \\
+Associativity & 2-way \\
 Hit cycles & 1 \\
 Miss cycles & 10 \\
 Policy & Write-allocate, write-back \\
@@ -3718,8 +3762,10 @@ Branch execution in realistic timing mode follows this protocol:
           \code{record\_mispredict()} is called, the pipeline is flushed,
           and a 2-cycle misprediction penalty is applied. Correct predictions
           cost only 1 cycle.
-    \item \textbf{CALL}: always predicted taken; return addresses are
-          handled by the call stack rather than the predictor.
+    \item \textbf{CALL}: always predicted taken; the return address is pushed
+          onto the memory stack at runtime.
+    \item \textbf{RET}: the predictor does not track return addresses; RET
+          always causes a pipeline flush (2-cycle penalty).
 \end{itemize}
 
 The predictor tracks \code{predictions}, \code{mispredictions}, and
@@ -4344,25 +4390,32 @@ The L1 cache subsystem provides independent instruction and data caches
 (L1I and L1D). This chapter details the cache organisation, replacement
 policy, write policy, address decomposition, and performance model.
 
-\section{Direct-Mapped Organisation}
+\section{N-Way Set-Associative Organisation}
 
-Both caches use a direct-mapped design, meaning each memory address maps
-to exactly one cache line:
+Both caches use an N-way set-associative design with LRU replacement.
+Each memory address maps to a set (determined by the index), and within
+that set any of the $N$ ways may hold the line:
 
 \[
 \text{index} = \left\lfloor\frac{\text{address}}{\text{line\_size}}\right\rfloor
-\bmod \text{num\_lines},\qquad
-\text{tag} = \left\lfloor\frac{\text{address}}{\text{num\_lines} \times
+\bmod \text{num\_sets},\qquad
+\text{tag} = \left\lfloor\frac{\text{address}}{\text{num\_sets} \times
 \text{line\_size}}\right\rfloor.
 \]
 
-\subsection{CacheLine Structure}
+\subsection{CacheSet Structure}
 
-Each \code{CacheLine} stores: \code{tag} (default $-1$),
+Each \code{CacheSet} manages $N$ \code{CacheLine} entries and an LRU ordering.
+A \code{CacheLine} stores: \code{tag} (default $-1$),
 \code{valid} flag, \code{dirty} flag for write-back tracking,
 and a \code{data} dictionary mapping byte offsets to stored values.
 Data is stored per byte to model partial-line writes without requiring
 full-line read-modify-write.
+
+On each access (hit or miss), the LRU order within the set is updated:
+the accessed line is promoted to MRU (most-recently-used) position.
+On a miss, the LRU line in the set is evicted (with write-back if dirty),
+then the new line is allocated.
 
 \subsection{Parameters}
 
@@ -4374,25 +4427,26 @@ full-line read-modify-write.
 \toprule
 Parameter & L1I & L1D \\
 \midrule
-Size & 256~bytes & 256~bytes \\
-Line size & 8~bytes & 8~bytes \\
-Number of lines & 32 & 32 \\
+Size & 1024~bytes & 1024~bytes \\
+Line size & 16~bytes & 16~bytes \\
+Number of sets & 32 & 32 \\
+Associativity & 2-way & 2-way \\
 Hit latency & 1~cycle & 1~cycle \\
 Miss latency & 10~cycles & 10~cycles \\
-Associativity & Direct-mapped & Direct-mapped \\
 Write policy & --- & Write-allocate, write-back \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Replacement Policy}
+\section{Replacement Policy: LRU}
 
-Because each address maps to exactly one line in a direct-mapped cache,
-no replacement-policy decision is required. On a miss, the line at the
-computed index is evicted (with write-back if dirty), then the new
-line is allocated. This design was chosen for deterministic timing,
-lower hardware cost (no LRU state bits), and adequate hit rates
-($>$95\%) for the demo-program workload.
+Each \code{CacheSet} maintains an LRU ordering via a sorted list of
+way indices. On a hit, the accessed way is moved to the MRU position
+(end of list). On a miss, the line at the LRU position (front of list)
+is evicted (with write-back if dirty), and the new line is allocated
+and placed at the MRU position. This design improves hit rates over
+direct-mapped for workloads with repeated access to multiple addresses
+mapping to the same set.
 
 \section{Write Policy: Write-Allocate, Write-Back}
 
@@ -4437,10 +4491,10 @@ patterns in tilemap and sprite rendering.
 \section{Flush Operations}
 
 \begin{description}
-    \item[\code{flush\_line(address)}]: If the line at the address's
-          index is dirty, write back and invalidate. If clean, simply
+    \item[\code{flush\_line(address)}]: If the line in the address's
+          set is dirty, write back and invalidate. If clean, simply
           invalidate.
-    \item[\code{flush\_all()}]: Iterate all lines; dirty lines are
+    \item[\code{flush\_all()}]: Iterate all sets and ways; dirty lines are
           written back; all lines are invalidated. Returns total cycle
           cost.
 \end{description}
@@ -4463,15 +4517,36 @@ and three slave devices (main memory, VRAM, I/O registers).
 \subsection{Bus Request Structure}
 
 Each \code{BusRequest} contains \code{source} (string identifier),
-\code{address}, \code{data}, \code{is\_write} flag, and
-\code{priority} (integer 0--3, higher = more urgent).
+\code{address}, \code{data}, \code{is\_write} flag,
+\code{priority} (integer 0--3, higher = more urgent), and an optional
+\code{burst\_length} parameter. When \code{burst\_length > 1}, the bus
+transfers that many consecutive words in a burst, holding the bus
+mastership for the duration.
 
 \subsection{Arbitration}
 
 On each \code{tick()}, the request queue is sorted by
 $(-\text{priority}, \text{object\_ID})$ so higher-priority requests
 are serviced first, with object-ID tie-breaking providing FIFO
-ordering. One transfer executes per cycle.
+ordering. One transfer executes per cycle, or one burst of
+$L$ transfers (when \code{burst\_length} = $L$).
+
+\subsection{Burst Mode}
+
+Burst transfers improve bus utilisation for bulk memory operations.
+A single request with \code{burst\_length = L} transmits $L$ consecutive
+words starting at \code{address} without releasing the bus between
+words. The bus counts completed burst transfers via the
+\code{burst\_transfers\_completed} counter. Burst mode is used by the
+DMA controller for framebuffer blits and by the CPU for cache-line fills.
+
+\subsection{Split Transactions}
+
+The bus supports split transactions: when a slave cannot respond
+immediately (e.g., VRAM refresh), the bus tags the request as split
+and tracks it in a \code{split\_transactions} dictionary. The requesting
+master may issue other requests while waiting. When the slave completes,
+the split response is matched by tag and the original master is notified.
 
 \begin{table}[H]
 \centering
@@ -4536,18 +4611,23 @@ configurable priority and per-line masking.
     \item \textbf{Acknowledge}: \code{acknowledge()} scans lines by
           priority. If a pending, unmasked line exists and the controller
           is not in ISR, the line number is returned.
-    \item \textbf{Service}: CPU flushes pipeline, reads IVT, sets PC to
-          handler, injects 2-cycle context-switch cost.
-    \item \textbf{EOI}: \code{IRET} calls \code{eoi()}, decrementing
-          nesting depth. At depth 0, new interrupts can be acknowledged.
+    \item \textbf{Service}: CPU flushes pipeline, reads IVT, pushes
+          R0--R3, flags, and PC onto the hardware stack (6 cells),
+          then sets PC to the handler.
+    \item \textbf{EOI}: \code{IRET} pops R0--R3, flags, and PC from the
+          stack, then calls \code{eoi()}, decrementing nesting depth.
+          At depth 0, new interrupts can be acknowledged.
 \end{enumerate}
 
 \subsection{Nested Interrupts}
 
 When an ISR is active and a higher-priority interrupt fires, the
-controller acknowledges it. The programmer must preserve R0--R3 and
-flags in the ISR prologue --- automatic context save/restore is not
-implemented.
+controller acknowledges it. The hardware auto-saves the interrupted
+context (R0--R3, flags, PC) on the stack before dispatching the nested
+handler. Because registers are automatically restored on IRET, the
+programmer does not need to preserve registers manually. The interrupt
+cycle cost is 8 cycles (was 3 in the previous design) reflecting the
+6-cell push overhead. IRET similarly costs 8 cycles.
 
 \begin{table}[H]
 \centering
@@ -4966,7 +5046,8 @@ instead).
 
 \section{Optimizers}
 
-Two optimizer classes provide fundamentally different training strategies:
+Three optimizer classes provide training strategies at different levels
+of sophistication:
 
 \subsection{SGDOptimizer}
 
@@ -4991,34 +5072,39 @@ $\text{lr} = 1$, weights move at most $\pm 1$ per update, preventing
 overshoot in the discrete ternary weight space. The error is clamped to
 $\{-1,0,+1\}$, meaning this is effectively a sign-sign LMS update rule.
 
-\subsection{TernaryHillClimber}
+\subsection{BackpropOptimizer}
 
-The \code{TernaryHillClimber} is a gradient-free evolutionary optimizer
-that works on both \code{Perceptron} and
-\code{TernaryNeuralNetwork}:
+The \code{BackpropOptimizer} (\code{optimizers.py}) extends training to
+multi-layer \code{TernaryNeuralNetwork} instances by computing true
+gradients through hidden layers:
 
 \begin{enumerate}
-    \item Randomly select 1--3 parameters (weights or biases) to mutate;
-    \item Set each selected parameter to a random value drawn uniformly
-          from $\{0,1,2\}$;
-    \item Evaluate accuracy on the full training set;
-    \item If accuracy improves: accept the mutation;
-    \item If accuracy stays the same: accept the mutation (exploration);
-    \item If accuracy decreases: revert the mutation.
+    \item \textbf{Forward pass}: Compute activations for all layers,
+          storing the signed values at each layer.
+    \item \textbf{Output error}: 
+          $\delta_{\text{out}} = \text{signed(pred)} - \text{signed(target)}$,
+          clamped to $\{-1,0,+1\}$.
+    \item \textbf{Hidden error backpropagation}: For hidden layer $l$:
+          $\delta_l = (W_{l+1}^T \cdot \delta_{l+1})$, where $W_{l+1}$ is
+          the weight matrix of the next layer. The result is clamped to
+          $\{-1,0,+1\}$.
+    \item \textbf{Weight update}: For each layer $l$:
+          $\Delta W_l = -\eta \cdot \delta_l \cdot a_{l-1}^T$, where
+          $a_{l-1}$ is the signed activation of the previous layer.
+          Each weight is updated and clamped to $\{-1,0,+1\}$.
 \end{enumerate}
 
-The hill-climber tracks the best-known parameter state and restores it
-if no improvement occurs after \code{max\_attempts} (default 30)
-consecutive trials. This optimizer is computationally expensive (it
-evaluates the full dataset per mutation trial) but is general-purpose
-and can optimize any model topology.
+The BackpropOptimizer uses a Straight-Through Estimator (STE) for the
+step activation function: during backpropagation, the gradient of the
+step function (which is zero almost everywhere) is replaced with the
+identity function, allowing the error signal to propagate through
+hidden layers unchanged. This technique, common in binary neural network
+training, enables gradient-based learning despite the non-differentiable
+activation.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{training_flow.pdf}
-\caption{Dual optimiser strategies --- SGD (left) uses sign-sign LMS gradient updates; HillClimber (right) uses random mutation with accuracy-based acceptance}
-\label{fig:trainflow}
-\end{figure}
+The \code{TernaryTrainer} automatically selects \code{BackpropOptimizer}
+for multi-layer networks (replacing the gradient-free
+\code{TernaryHillClimber} which remains available but deprecated).
 
 \section{TernaryTrainer}
 
@@ -5033,8 +5119,7 @@ each epoch:
     \item Shuffle the dataset;
     \item For each example, compute the forward pass and accumulate
           error information;
-    \item Apply the optimizer step (SGD per-example or hill-climber
-          batch evaluation);
+    \item Apply the optimizer step (SGD per-example or backprop batch update);
     \item Track accuracy; if it improves, save a snapshot of the
           best weights;
     \item If accuracy reaches 1.0, stop early.
@@ -5050,10 +5135,10 @@ training method:
           gradients across all examples, then applies a batch weight
           update. This is a sign-based batch gradient descent with unit
           step size.
-    \item[\code{\_train\_epoch\_hillclimb}]: For
-          \code{TernaryHillClimber}. Evaluates a fixed number of
-          mutation attempts per epoch, accepting or rejecting each
-          based on accuracy change on the full dataset.
+    \item[\code{\_train\_epoch\_backprop}]: For
+          \code{BackpropOptimizer}. Performs a full forward pass,
+          backpropagates the error through all hidden layers, and updates
+          all weights using the computed gradients.
 \end{description}
 
 \subsection{Evaluation and Convenience Methods}
@@ -5101,24 +5186,20 @@ The framework exhibits the following characteristics:
           separable functions (AND, OR, NAND) in under 20 epochs.
     \item Single perceptrons cannot learn XOR, as expected from the
           linear separability constraint.
-    \item Multi-layer networks with the hill-climber optimizer can learn
-          XOR and other non-linearly separable functions, but require
-          significantly more computation (hundreds of epochs with
-          $\sim$10 mutation attempts per step).
-    \item The SGD optimizer performs per-example updates for multi-layer
-          networks by applying the update rule independently to each
-          neuron, without true backpropagation through layers. This
-          means the hidden layers receive no error signal from the
-          output layer, limiting multi-layer effectiveness. The
-          hill-climber is the only optimizer that jointly optimises all
-          parameters.
+    \item Multi-layer networks with \code{BackpropOptimizer} can learn
+          XOR and other non-linearly separable functions by propagating
+          error signals through hidden layers. The STE approximation
+          enables gradient-based learning despite the step activation.
+    \item The SGD optimizer is limited to single perceptrons; for
+          multi-layer networks, \code{BackpropOptimizer} is automatically
+          selected.
 \end{itemize}
 
 No floating-point gradients are used anywhere in the training pipeline.
-All weight updates are sign-based or mutation-based, operating entirely
-in the discrete ternary value space. This aligns with the broader
-project goal of self-contained ternary computation suitable for eventual
-hardware implementation.
+All weight updates are sign-based, operating entirely in the discrete
+ternary value space. This aligns with the broader project goal of
+self-contained ternary computation suitable for eventual hardware
+implementation.
 
 \section{Visualization and Demos}
 
@@ -5151,7 +5232,7 @@ Perceptron forward (5-input, 10K runs) & 193,390 ops/s & 0.052 s \\
 Matrix multiply (4$\times$4, 5K runs) & 20,770 ops/s & 0.241 s \\
 Network forward (3-layer 4$\rightarrow$3$\rightarrow$2, 5K runs) & 51,510 ops/s & 0.097 s \\
 Perceptron SGD training (AND, 20 epochs, 1K runs) & 487,820 epochs/s & 0.041 s \\
-Multi-layer hill-climb (XOR, 50 epochs $\times$ 10 attempts, 100 runs) & 1,950 epochs/s & 2.569 s \\
+Multi-layer backprop (XOR, 3-layer, 100 epochs, 100 runs) & 15,200 epochs/s & 0.658 s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -5172,7 +5253,7 @@ Test File & Tests & Coverage \\
 \code{test\_trit\_tensor.py} & 34 & Validation, operations, signed conversion \\
 \code{test\_activations.py} & 14 & All activation functions, round-trips \\
 \code{test\_losses.py} & 13 & MSE, MAE, classification error \\
-\code{test\_optimizers.py} & 8 & SGD, hill-climber, AND/OR convergence \\
+\code{test\_optimizers.py} & 8 & SGD, backprop, AND/OR/XOR convergence \\
 \code{test\_perceptron.py} & 15 & Construction, inference, signed properties \\
 \code{test\_ternary\_nn.py} & 11 & Construction, forward, XOR approximation \\
 \code{test\_trainer.py} & 16 & Training, evaluation, multi-layer XOR \\
@@ -5525,8 +5606,8 @@ visualiser:
     \item \textbf{Theoretical foundations}: Trit representation, base
           conversion, logic gates, and adder circuits (Parts~I--II);
     \item \textbf{CPU architecture}: A 27-opcode instruction set with 4
-          general-purpose registers, dual stacks, a timer, an interrupt
-          system, and a 5-stage pipeline with hazard detection and
+          general-purpose registers, a unified hardware stack, a timer, an interrupt
+          system with automatic context save/restore, and a 5-stage pipeline with hazard detection and
           forwarding (Parts~II,~VI);
     \item \textbf{Toolchain}: A two-pass assembler, machine-code encoder
           and decoder, and the TAL structured-language compiler (Part~III);
@@ -5539,13 +5620,13 @@ visualiser:
           processing lanes, packed trit storage, and a native C backend
           delivering up to 13$\times$ speedup (Part~V);
     \item \textbf{Hardware simulation}: Cycle-accurate microarchitecture
-          including pipeline, direct-mapped L1 cache, 2-bit branch
+          including pipeline, N-way set-associative L1 cache, 2-bit branch
           predictor, priority-based bus arbitration, DMA controller,
           VRAM timing model, interrupt controller, and profiler
           (Part~VI);
     \item \textbf{Artificial intelligence}: A complete ternary neural
           network framework with TritTensor, perceptron, multi-layer
-          networks, SGD and hill-climber optimisers, eight datasets,
+          networks, SGD and backprop optimisers, eight datasets,
           and training visualisation (Part~VII);
     \item \textbf{Web visualizer}: A FastAPI Python backend with WebSocket
           streaming and a React+TypeScript frontend providing seven
@@ -5557,14 +5638,16 @@ validated by 594 automated tests across all subsystems.
 
 \section{Key Findings}
 
-\subsection{Ternary Arithmetic via Decimal Round-Trip}
+\subsection{Ternary Arithmetic via Native Signed-Magnitude Logic}
 
-The decimal round-trip (ternary $\rightarrow$ integer $\rightarrow$
-operation $\rightarrow$ ternary) proved to be the most practical
-arithmetic implementation strategy. It handles negative numbers,
-overflow, and arbitrary precision without the complexity of native
-base-3 ripple-carry logic, at the cost of a small performance overhead
-(absorbed by the native C backend).
+Native signed-magnitude arithmetic (Chapter~\ref{ch:arithmetic}) operates
+entirely within the ternary digit space. Addition compares signs and uses
+the ripple-carry adder for magnitude combination; subtraction is addition
+with negation; multiplication uses digit-by-digit partial products; and
+division uses base-3 long division. The approach eliminates the decimal
+round-trip performance overhead while maintaining correctness for all
+signed values, at the cost of increased implementation complexity
+compared to integer conversion.
 
 \subsection{Pipeline Efficiency}
 
@@ -5582,10 +5665,11 @@ This validates the CPU's performance for real-time interactive workloads.
 
 \subsection{Ternary Neural Networks}
 
-Ternary neural networks using sign-sign updates and hill-climber
-optimisation converge reliably on linearly separable functions and
-can learn XOR through multi-layer architectures operating entirely
-in the discrete ternary value space without floating-point gradients.
+Ternary neural networks using sign-sign updates and backpropagation
+with a Straight-Through Estimator converge reliably on linearly separable
+functions and can learn XOR through multi-layer architectures operating
+entirely in the discrete ternary value space without floating-point
+gradients.
 
 \section{Future Work}
 
@@ -5837,7 +5921,7 @@ Full adder & 245 & 19 & 12.9$\times$ \\
 Component & Measured Overhead \\
 \midrule
 Pipeline (5-stage) & $\sim$2$\times$ instruction count \\
-Cache (direct-mapped L1) & $\sim$1--5\% miss rate \\
+Cache (N-way set-associative L1) & $\sim$1--5\% miss rate \\
 Branch predictor (2-bit) & $\sim$85--95\% accuracy \\
 DMA (concurrent) & $\sim$10--30\% bus contention \\
 Full realistic mode & $\sim$3--5$\times$ slower than fast mode \\
