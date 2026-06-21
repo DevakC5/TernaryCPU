@@ -1,0 +1,15 @@
+{
+  "format": "ternary_nn_v1",
+  "accuracy": 1.0,
+  "layers": [
+    [
+      {
+        "weights": [
+          0,
+          0
+        ],
+        "bias": 2
+      }
+    ]
+  ]
+}
