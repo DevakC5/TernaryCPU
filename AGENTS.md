@@ -21,8 +21,11 @@ python -m trinary.native_benchmark            # benchmark native C vs Python
 python test_snake_tal.py                      # TAL-compiled snake CPU test (13 frames)
 python train_mnist.py                         # MNIST training (ternary NN)
 python AI/train.py                            # standalone ternary NN on logic gates
-python AI/train.py --gate xor                 # XOR only (2-layer hill-climber)
+python AI/train.py --dataset patterns            # 9-input pattern matching
+python AI/train.py --dataset equality --layers 2 --width 8  # dense: 2×8×8×1
 ```
+
+## AI/ directory (standalone ternary NN trainer)
 
 Use `-s` and `--tb=short` for debugging.
 

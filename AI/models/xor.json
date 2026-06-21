@@ -1,19 +1,24 @@
 {
   "format": "ternary_nn_v1",
   "accuracy": 1.0,
+  "loss": 0.0,
+  "architecture": [
+    2,
+    1
+  ],
   "layers": [
     [
       {
         "weights": [
           0,
-          0
+          2
         ],
         "bias": 2
       },
       {
         "weights": [
           2,
-          2
+          0
         ],
         "bias": 2
       }
@@ -21,10 +26,10 @@
     [
       {
         "weights": [
-          2,
-          2
+          0,
+          0
         ],
-        "bias": 0
+        "bias": 2
       }
     ]
   ]

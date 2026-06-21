@@ -1,40 +1,43 @@
 #!/usr/bin/env python3
-"""Self-contained ternary neural network — train on logic gates.
+"""Self-contained ternary neural network trainer.
+
+Supports single perceptrons (AND/OR/NAND) and multi-layer networks
+trained via hill-climbing for harder problems (XOR, EQUALITY, patterns).
 
 Usage:
-    python AI/train.py               # train all gates
-    python AI/train.py --gate xor    # train XOR (needs 2-layer network)
-    python AI/train.py --gate and    # single perceptron is enough
+    python AI/train.py                               # all gate demos
+    python AI/train.py --dataset equality            # 9-example ternary equality
+    python AI/train.py --dataset patterns            # 9-input pattern matching
+    python AI/train.py --gate xor --hidden 4         # custom XOR width
+    python AI/train.py --dataset equality --layers 3 --width 8  # deep dense
 """
 
 import argparse
 import os
 import random
-import math
 import json
+import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MODELS_DIR = os.path.join(_HERE, "models")
 
 
 # ---------------------------------------------------------------------------
-# Ternary helpers
+# Ternary math
 # ---------------------------------------------------------------------------
 
-def signed(trit):
-    return trit - 1  # 0→-1, 1→0, 2→+1
-
+def signed(t):
+    return t - 1  # 0→-1, 1→0, 2→+1
 
 def to_trit(v):
     return 0 if v < -0.33 else 2 if v > 0.33 else 1
-
 
 def ternary_step(v):
     return 1 if v == 0 else (2 if v > 0 else 0)
 
 
 # ---------------------------------------------------------------------------
-# Perceptron — one ternary neuron
+# Perceptron
 # ---------------------------------------------------------------------------
 
 class Perceptron:
@@ -66,10 +69,16 @@ class TernaryNN:
             cur = [n.forward(cur) for n in layer]
         return cur
 
-    def save(self, path, acc=0.0):
+    @property
+    def num_params(self):
+        return sum(len(n.weights) + 1 for layer in self.layers for n in layer)
+
+    def save(self, path, acc=0.0, loss=None):
         data = {
             "format": "ternary_nn_v1",
             "accuracy": acc,
+            "loss": loss,
+            "architecture": [len(layer) for layer in self.layers],
             "layers": [
                 [{"weights": n.weights, "bias": n.bias} for n in layer]
                 for layer in self.layers
@@ -88,9 +97,24 @@ class TernaryNN:
         ]
         return cls(layers)
 
+    @classmethod
+    def build(cls, layer_sizes, seed=None):
+        rng = random.Random(seed)
+        layers = []
+        for i in range(len(layer_sizes) - 1):
+            n_in = layer_sizes[i]
+            n_out = layer_sizes[i + 1]
+            neurons = []
+            for _ in range(n_out):
+                w = [rng.choice([0, 1, 2]) for _ in range(n_in)]
+                b = rng.choice([0, 1, 2])
+                neurons.append(Perceptron(w, b))
+            layers.append(neurons)
+        return cls(layers)
+
 
 # ---------------------------------------------------------------------------
-# Datasets (ternary digits 0/1/2)
+# Datasets
 # ---------------------------------------------------------------------------
 
 AND = [([0, 0], [0]), ([0, 2], [0]), ([2, 0], [0]), ([2, 2], [2])]
@@ -98,11 +122,39 @@ OR  = [([0, 0], [0]), ([0, 2], [2]), ([2, 0], [2]), ([2, 2], [2])]
 XOR = [([0, 0], [0]), ([0, 2], [2]), ([2, 0], [2]), ([2, 2], [0])]
 NAND = [([0, 0], [2]), ([0, 2], [2]), ([2, 0], [2]), ([2, 2], [0])]
 
-GATES = {"and": AND, "or": OR, "xor": XOR, "nand": NAND}
+TERNARY_EQUALITY = [
+    ([0, 0], [2]), ([0, 1], [0]), ([0, 2], [0]),
+    ([1, 0], [0]), ([1, 1], [2]), ([1, 2], [0]),
+    ([2, 0], [0]), ([2, 1], [0]), ([2, 2], [2]),
+]
+
+TERNARY_TRUTH_TABLE = [
+    ([0, 0], [1]), ([0, 1], [1]), ([0, 2], [1]),
+    ([1, 0], [1]), ([1, 1], [1]), ([1, 2], [1]),
+    ([2, 0], [1]), ([2, 1], [1]), ([2, 2], [1]),
+]
+
+TINY_PATTERNS = [
+    ([2, 0, 2, 0, 2, 0, 2, 0, 2], [2]),
+    ([0, 2, 0, 2, 0, 2, 0, 2, 0], [0]),
+]
+
+PATTERN_CROSS = [
+    ([0, 2, 0, 2, 2, 2, 0, 2, 0], [2]),
+    ([2, 0, 2, 0, 2, 0, 2, 0, 2], [0]),
+]
+
+DATASETS = {
+    "and": AND, "or": OR, "xor": XOR, "nand": NAND,
+    "equality": TERNARY_EQUALITY,
+    "truth_table": TERNARY_TRUTH_TABLE,
+    "patterns": TINY_PATTERNS,
+    "cross": PATTERN_CROSS,
+}
 
 
 # ---------------------------------------------------------------------------
-# Training
+# Metrics
 # ---------------------------------------------------------------------------
 
 def accuracy(model, dataset):
@@ -116,8 +168,28 @@ def accuracy(model, dataset):
     return correct / len(dataset)
 
 
-def train_single(model, dataset, epochs=100):
-    """Train a single perceptron (batch SGD in ternary space)."""
+def classification_error(model, dataset):
+    total = 0.0
+    for ins, tgt in dataset:
+        out = model.forward(ins)
+        out_list = out if isinstance(out, list) else [out]
+        total += sum(abs(signed(o) - signed(t)) for o, t in zip(out_list, tgt))
+    return total / len(dataset)
+
+
+def split_dataset(dataset, ratio=0.75, seed=None):
+    rng = random.Random(seed)
+    items = list(dataset)
+    rng.shuffle(items)
+    split = max(1, int(len(items) * ratio))
+    return items[:split], items[split:]
+
+
+# ---------------------------------------------------------------------------
+# Single perceptron trainer (batch SGD)
+# ---------------------------------------------------------------------------
+
+def train_single(model, dataset, epochs=300):
     best_acc, best_w, best_b = 0.0, None, None
     for ep in range(epochs):
         dw = [0] * len(model.weights)
@@ -130,31 +202,29 @@ def train_single(model, dataset, epochs=100):
                 dw[i] += si[i] * err
             db += err
         for i in range(len(model.weights)):
-            delta = max(-1, min(1, dw[i]))
-            new_w = max(-1, min(1, signed(model.weights[i]) + delta))
-            model.weights[i] = to_trit(new_w)
-        delta_b = max(-1, min(1, db))
-        new_b = max(-1, min(1, signed(model.bias) + delta_b))
-        model.bias = to_trit(new_b)
+            d = max(-1, min(1, dw[i]))
+            nw = max(-1, min(1, signed(model.weights[i]) + d))
+            model.weights[i] = to_trit(nw)
+        d = max(-1, min(1, db))
+        nb = max(-1, min(1, signed(model.bias) + d))
+        model.bias = to_trit(nb)
 
         acc = accuracy(model, dataset)
         if acc > best_acc:
             best_acc, best_w, best_b = acc, list(model.weights), model.bias
         if acc >= 1.0:
             break
-
     if best_w:
         model.weights = best_w
         model.bias = best_b
     return best_acc
 
 
-def rand_weights(n):
-    return [random.choice([0, 1, 2]) for _ in range(n)]
-
+# ---------------------------------------------------------------------------
+# Hill-climbing trainer for multi-layer networks
+# ---------------------------------------------------------------------------
 
 def _mutate(p, rate=0.3):
-    """Randomly flip weights/bias with given probability."""
     for i in range(len(p.weights)):
         if random.random() < rate:
             p.weights[i] = random.choice([0, 1, 2])
@@ -163,42 +233,66 @@ def _mutate(p, rate=0.3):
 
 
 def _copy_net(model):
-    layers = [[Perceptron(list(n.weights), n.bias) for n in layer] for layer in model.layers]
+    layers = [[Perceptron(list(n.weights), n.bias) for n in layer]
+              for layer in model.layers]
     return TernaryNN(layers)
 
 
-def train_xor(epochs=500):
-    """Hill-climbing search for XOR since ternary gradient is too sparse."""
-    best_acc, best_model = 0.0, None
+def _mutate_net(model, rate=0.3):
+    for layer in model.layers:
+        for n in layer:
+            _mutate(n, rate)
 
-    for trial in range(200):
-        hidden = [Perceptron(rand_weights(2), random.choice([0, 1, 2]))
-                  for _ in range(2)]
-        out = Perceptron(rand_weights(2), random.choice([0, 1, 2]))
-        model = TernaryNN([hidden, [out]])
+
+def train_hillclimb(dataset, layer_sizes, trials=200, epochs=500, seed=None,
+                    test_split=0.0, verbose=False):
+    """Hill-climbing trainer for multi-layer ternary networks.
+
+    Returns (best_model, best_train_acc, best_test_acc, best_loss).
+    """
+    if test_split > 0:
+        train_data, test_data = split_dataset(dataset, ratio=1 - test_split, seed=seed)
+    else:
+        train_data = dataset
+        test_data = []
+
+    best_acc, best_test_acc, best_loss = 0.0, 0.0, float("inf")
+    best_model = None
+    rng = random.Random
+
+    for trial in range(trials):
+        model = TernaryNN.build(layer_sizes, seed=(seed or 0) + trial)
         cur = _copy_net(model)
-        cur_acc = accuracy(cur, XOR)
+        cur_acc = accuracy(cur, train_data)
 
         for ep in range(epochs):
             candidate = _copy_net(cur)
-            for n in candidate.layers[0]:
-                _mutate(n)
-            _mutate(candidate.layers[1][0])
+            _mutate_net(candidate, rate=0.3)
 
-            cand_acc = accuracy(candidate, XOR)
-            if cand_acc >= cur_acc:
+            cand_acc = accuracy(candidate, train_data)
+            if cand_acc > cur_acc or (cand_acc == cur_acc and
+                                        classification_error(candidate, train_data) <
+                                        classification_error(cur, train_data)):
                 cur = candidate
                 cur_acc = cand_acc
 
-            if cur_acc > best_acc:
+            if cur_acc > best_acc or (cur_acc == best_acc and
+                                       classification_error(cur, train_data) < best_loss):
                 best_acc = cur_acc
+                best_loss = classification_error(cur, train_data)
                 best_model = _copy_net(cur)
+                best_test_acc = accuracy(best_model, test_data) if test_data else best_acc
+                if verbose:
+                    te = best_test_acc if test_data else best_acc
+                    print(f"  trial {trial+1:3d}/{trials} ep {ep+1:4d} — "
+                          f"train {best_acc:.0%} test {te:.0%} loss {best_loss:.2f}")
+
             if best_acc >= 1.0:
                 break
         if best_acc >= 1.0:
             break
 
-    return best_model, best_acc
+    return best_model, best_acc, best_test_acc, best_loss
 
 
 # ---------------------------------------------------------------------------
@@ -206,41 +300,87 @@ def train_xor(epochs=500):
 # ---------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description="Train ternary neural network on logic gates")
-    ap.add_argument("--gate", choices=list(GATES) + ["all"], default="all")
-    ap.add_argument("--epochs", type=int, default=200)
+    ap = argparse.ArgumentParser(
+        description="Ternary neural network trainer")
+    ap.add_argument("--gate", choices=[k for k in DATASETS if k != "equality"],
+                    help="Train a specific logic gate")
+    ap.add_argument("--dataset", choices=list(DATASETS),
+                    default=None, help="Dataset to train on")
+    ap.add_argument("--layers", type=int, default=0,
+                    help="Hidden layers (0 = single perceptron)")
+    ap.add_argument("--width", type=int, default=4,
+                    help="Neurons per hidden layer")
+    ap.add_argument("--epochs", type=int, default=1000)
+    ap.add_argument("--trials", type=int, default=300)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--test", type=float, default=0.0,
+                    help="Test split ratio (e.g. 0.25)")
+    ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
     random.seed(args.seed)
-
-    gates_to_run = list(GATES) if args.gate == "all" else [args.gate]
-
     os.makedirs(_MODELS_DIR, exist_ok=True)
 
-    for name in gates_to_run:
-        ds = GATES[name]
-        if name == "xor":
-            print(f"\n=== XOR (2-layer network) ===")
-            model, acc = train_xor(epochs=args.epochs)
-            print(f"  Test accuracy: {acc:.0%}")
-            if acc >= 1.0:
-                for ins, _ in ds:
-                    print(f"    {ins} → {model.forward(ins)}")
-            model.save(os.path.join(_MODELS_DIR, f"{name}.json"), acc)
-        else:
+    dataset_name = args.dataset or args.gate or "all"
+    if dataset_name == "all":
+        targets = list(DATASETS)
+    else:
+        targets = [dataset_name]
+
+    for name in targets:
+        ds = DATASETS[name]
+        n_in = len(ds[0][0])
+        n_out = len(ds[0][1])
+
+        can_single = name in ("and", "or", "nand")
+        use_single = can_single and args.layers == 0
+
+        if use_single:
+            # Single perceptron with batch SGD
             print(f"\n=== {name.upper()} (single perceptron) ===")
-            p = Perceptron(rand_weights(2), random.choice([0, 1, 2]))
-            acc = train_single(p, ds, epochs=args.epochs)
+            p = Perceptron([random.choice([0, 1, 2]) for _ in range(n_in)],
+                           random.choice([0, 1, 2]))
+            acc = train_single(p, ds, epochs=min(args.epochs, 300))
+            loss = classification_error(p, ds)
             print(f"  Weights: {p.weights}, Bias: {p.bias}")
-            print(f"  Test accuracy: {acc:.0%}")
+            print(f"  Accuracy: {acc:.0%}  Error: {loss:.2f}")
             for ins, _ in ds:
                 print(f"    {ins} → [{p.forward(ins)}]")
             model = TernaryNN([[p]])
-            model.save(os.path.join(_MODELS_DIR, f"{name}.json"), acc)
+            model.save(os.path.join(_MODELS_DIR, f"{name}.json"), acc, loss)
 
-    # Summary
-    print("\nDone. Models saved to AI/models/")
+        else:
+            # Multi-layer hill-climbing
+            if name in ("and", "or", "nand") and args.layers == 0:
+                continue
+
+            layer_sizes = [n_in]
+            if args.layers > 0:
+                layer_sizes.extend([args.width] * args.layers)
+            layer_sizes.append(n_out)
+
+            print(f"\n=== {name.upper()} ({' × '.join(str(s) for s in layer_sizes)}) ===")
+            t0 = time.time()
+            model, train_acc, test_acc, loss = train_hillclimb(
+                ds, layer_sizes,
+                trials=args.trials,
+                epochs=args.epochs,
+                seed=args.seed,
+                test_split=args.test,
+                verbose=args.verbose,
+            )
+            dt = time.time() - t0
+            params = model.num_params
+            print(f"  Architecture: {' × '.join(str(s) for s in layer_sizes)}")
+            print(f"  Parameters: {params}")
+            print(f"  Train accuracy: {train_acc:.0%}  Test accuracy: {test_acc:.0%}")
+            print(f"  Error: {loss:.2f}  Time: {dt:.1f}s")
+            for ins, _ in ds:
+                print(f"    {ins} → {model.forward(ins)}")
+            model.save(os.path.join(_MODELS_DIR, f"{name}.json"), max(train_acc, test_acc), loss)
+
+    print(f"\nDone. Models in {_MODELS_DIR}")
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,10 @@
 {
   "format": "ternary_nn_v1",
   "accuracy": 1.0,
+  "loss": 0.0,
+  "architecture": [
+    1
+  ],
   "layers": [
     [
       {
