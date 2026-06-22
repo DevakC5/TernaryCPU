@@ -23,11 +23,21 @@ python train_mnist.py                         # MNIST training (ternary NN)
 python AI/train.py                            # standalone ternary NN on logic gates
 python AI/train.py --dataset patterns            # 9-input pattern matching
 python AI/train.py --dataset equality --layers 2 --width 8  # dense: 2×8×8×1
+python AI/train_mnist.py --backend gpu --width 128     # GPU: ~76% in 2s (needs PyTorch CUDA)
 ```
 
-## AI/ directory (standalone ternary NN trainer)
-
 Use `-s` and `--tb=short` for debugging.
+
+## AI/ directory
+
+Self-contained logic-gate trainer at `AI/train.py`. GPU-accelerated MNIST at `AI/train_mnist.py` (PyTorch STE). All logic gates converge to 100%. Best MNIST: **76.1%** test (784→128→10, 5000 train, 50 epochs, 2s).
+
+```sh
+python AI/train.py --dataset equality --layers 2 --width 8   # deep network
+bash data/download_mnist.sh                                  # one-time MNIST data
+python AI/train_mnist.py --backend gpu --width 128           # 76% in 2s
+python AI/train_mnist.py --backend gpu --layers 2 --width 256 # deeper
+```
 
 ## Key docs
 

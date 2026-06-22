@@ -3,3 +3,4 @@ __pycache__/
 *.egg-info/
 *.zip
 .pytest_cache/
+data/mnist/
